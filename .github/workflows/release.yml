@@ -1,8 +1,10 @@
 name: Release
+
 on:
   push:
     branches:
       - master
+
 jobs:
   build-and-check:
     name: Build and Check Version
@@ -15,12 +17,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Set up JDK 8
         uses: actions/setup-java@v3
         with:
           java-version: '8'
           distribution: 'temurin'
           cache: maven
+
       - name: Extract version from pom.xml
         id: get_version
         run: |
@@ -28,6 +32,7 @@ jobs:
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected version: $VERSION"
+
       - name: Check if tag exists
         id: check_tag
         run: |
@@ -39,21 +44,23 @@ jobs:
             echo "TAG_EXISTS=true" >> $GITHUB_OUTPUT
             echo "Tag already exists, will skip release"
           fi
+      
       - name: Build with Maven
         id: build
         if: steps.check_tag.outputs.TAG_EXISTS == 'false'
         run: |
           cd rocketrest-core
           mvn -B clean package javadoc:jar
+      
       - name: Upload artifacts
         if: steps.check_tag.outputs.TAG_EXISTS == 'false'
         uses: actions/upload-artifact@v4
         with:
           name: jar-artifacts
           path: |
-            rocketrest-core/target/rocketrest-core-${{ steps.get_version.outputs.VERSION }}.jar
-            rocketrest-core/target/rocketrest-core-${{ steps.get_version.outputs.VERSION }}-javadoc.jar
+            rocketrest-core/target/*.jar
           retention-days: 1
+
   tag-and-release:
     name: Tag and Release
     needs: build-and-check
@@ -67,6 +74,7 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.PAT_GITHUB }}
+
       - name: Create and push tag
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
@@ -76,16 +84,19 @@ jobs:
           git push origin "v${{ needs.build-and-check.outputs.version }}"
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           name: jar-artifacts
           path: artifacts
+          
       - name: Check artifact structure
         run: |
           find artifacts -type f | sort
           echo "------"
           ls -la artifacts/
+
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v1
@@ -95,7 +106,6 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            artifacts/rocketrest-core-${{ needs.build-and-check.outputs.version }}.jar
-            artifacts/rocketrest-core-${{ needs.build-and-check.outputs.version }}-javadoc.jar
+            artifacts/*.jar
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
