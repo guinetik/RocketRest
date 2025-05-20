@@ -4,18 +4,17 @@ on:
     branches:
       - master
 jobs:
-  tag-and-release:
-    name: Tag and Release
+  build-and-check:
+    name: Build and Check Version
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.VERSION }}
-      tag_created: ${{ steps.tag.outputs.TAG_CREATED }}
+      tag_exists: ${{ steps.check_tag.outputs.TAG_EXISTS }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.PAT_GITHUB }}
       - name: Set up JDK 8
         uses: actions/setup-java@v3
         with:
@@ -25,86 +24,78 @@ jobs:
       - name: Extract version from pom.xml
         id: get_version
         run: |
+          cd rocketrest-core
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected version: $VERSION"
-
       - name: Check if tag exists
         id: check_tag
         run: |
           TAG_EXISTS=$(git tag -l "v${{ steps.get_version.outputs.VERSION }}")
           if [ -z "$TAG_EXISTS" ]; then
             echo "TAG_EXISTS=false" >> $GITHUB_OUTPUT
-            echo "Tag does not exist, will create it"
+            echo "Tag does not exist, will proceed with build and release"
           else
             echo "TAG_EXISTS=true" >> $GITHUB_OUTPUT
-            echo "Tag already exists, skipping creation"
+            echo "Tag already exists, will skip release"
           fi
-
-      - name: Create and push tag
-        id: tag
+      - name: Build with Maven
+        id: build
         if: steps.check_tag.outputs.TAG_EXISTS == 'false'
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          echo "Creating tag v${{ steps.get_version.outputs.VERSION }}"
-          git tag -a "v${{ steps.get_version.outputs.VERSION }}" -m "Release v${{ steps.get_version.outputs.VERSION }}"
-          git push origin "v${{ steps.get_version.outputs.VERSION }}"
-          echo "TAG_CREATED=true" >> $GITHUB_OUTPUT
-        env:
-          GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
-  build:
-    name: Build
-    needs: tag-and-release
-    if: needs.tag-and-release.outputs.tag_created == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          ref: v${{ needs.tag-and-release.outputs.version }}
-      - name: Set up JDK 8
-        uses: actions/setup-java@v3
-        with:
-          java-version: '8'
-          distribution: 'temurin'
-          cache: maven
-      - name: Build with Maven
-        run: mvn -B clean package javadoc:jar
-      - name: Upload JAR
+          cd rocketrest-core
+          mvn -B clean package javadoc:jar
+      - name: Upload artifacts
+        if: steps.check_tag.outputs.TAG_EXISTS == 'false'
         uses: actions/upload-artifact@v4
         with:
           name: jar-artifacts
           path: |
-            rocketrest-core/target/rocketrest-core-${{ needs.tag-and-release.outputs.version }}.jar
-            rocketrest-core/target/rocketrest-core-${{ needs.tag-and-release.outputs.version }}-javadoc.jar
+            rocketrest-core/target/rocketrest-core-${{ steps.get_version.outputs.VERSION }}.jar
+            rocketrest-core/target/rocketrest-core-${{ steps.get_version.outputs.VERSION }}-javadoc.jar
           retention-days: 1
-
-  release:
-    name: Create Release
-    needs: [tag-and-release, build]
-    if: needs.tag-and-release.outputs.tag_created == 'true'
+  tag-and-release:
+    name: Tag and Release
+    needs: build-and-check
+    if: needs.build-and-check.outputs.tag_exists == 'false'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: v${{ needs.tag-and-release.outputs.version }}
-      - name: Download all artifacts
+          fetch-depth: 0
+          token: ${{ secrets.PAT_GITHUB }}
+      - name: Create and push tag
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          echo "Creating tag v${{ needs.build-and-check.outputs.version }}"
+          git tag -a "v${{ needs.build-and-check.outputs.version }}" -m "Release v${{ needs.build-and-check.outputs.version }}"
+          git push origin "v${{ needs.build-and-check.outputs.version }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
+      - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           name: jar-artifacts
           path: artifacts
+      - name: Check artifact structure
+        run: |
+          find artifacts -type f | sort
+          echo "------"
+          ls -la artifacts/
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ needs.tag-and-release.outputs.version }}
-          name: RocketRest v${{ needs.tag-and-release.outputs.version }}
+          tag_name: v${{ needs.build-and-check.outputs.version }}
+          name: RocketRest v${{ needs.build-and-check.outputs.version }}
           draft: false
           prerelease: false
           files: |
-            artifacts/rocketrest-core-${{ needs.tag-and-release.outputs.version }}.jar
-            artifacts/rocketrest-core-${{ needs.tag-and-release.outputs.version }}-javadoc.jar
+            artifacts/rocketrest-core-${{ needs.build-and-check.outputs.version }}.jar
+            artifacts/rocketrest-core-${{ needs.build-and-check.outputs.version }}-javadoc.jar
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
