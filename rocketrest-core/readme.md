@@ -10,6 +10,139 @@ Key aspects covered:
 - Error handling and resilience features
 - Extension points and customization
 
+## Overview
+```mermaid
+flowchart TD
+    RocketRest["RocketRest (Facade API)"]:::facade
+
+    subgraph "Configuration"
+        Config["RocketRestConfig"]:::core
+        Options["RocketRestOptions"]:::core
+        SecureConfig["RocketRestSecureConfig"]:::core
+    end
+
+    subgraph "API Client Layer"
+        AbstractApiClient["AbstractApiClient"]:::core
+        DefaultApiClient["DefaultApiClient"]:::core
+        AsyncApiClient["AsyncApiClient"]:::core
+        FluentApiClient["FluentApiClient"]:::core
+    end
+
+    subgraph "HTTP Transport & Decorators"
+        Factory["RocketClientFactory"]:::core
+        RCInterface["RocketClient (interface)"]:::transport
+        DefaultHttpClient["DefaultHttpClient"]:::transport
+        AsyncHttpClient["AsyncHttpClient"]:::transport
+        CircuitBreakerClient["CircuitBreakerClient"]:::transport
+        MockRocketClient["MockRocketClient"]:::transport
+    end
+
+    subgraph "Auth Strategies"
+        AuthFactory["AuthStrategyFactory"]:::core
+        BasicAuthStrategy["BasicAuthStrategy"]:::strategy
+        BearerTokenStrategy["BearerTokenStrategy"]:::strategy
+        NoAuthStrategy["NoAuthStrategy"]:::strategy
+        AbstractOAuth2["AbstractOAuth2Strategy"]:::strategy
+        OAuth2AssertionStrategy["OAuth2AssertionStrategy"]:::strategy
+        OAuth2ClientCredStrategy["OAuth2ClientCredentialsStrategy"]:::strategy
+        OAuth2PasswordStrategy["OAuth2PasswordStrategy"]:::strategy
+    end
+
+    subgraph "JSON, Request & Result Utilities"
+        JsonObjectMapper["JsonObjectMapper"]:::utils
+        RequestBuilder["RequestBuilder"]:::utils
+        RequestSpec["RequestSpec"]:::utils
+        Result["Result"]:::utils
+        ApiError["ApiError"]:::utils
+        ResponseLogger["ResponseLogger"]:::utils
+        StreamUtils["StreamUtils"]:::utils
+    end
+
+    Examples["Examples Module"]:::facade
+
+    Examples -->|"uses"| RocketRest
+    RocketRest -->|configures| Config
+    RocketRest -->|configures| Options
+    RocketRest -->|configures| SecureConfig
+    RocketRest -->|delegates to| AbstractApiClient
+    RocketRest -->|delegates to| AsyncApiClient
+    RocketRest -->|delegates to| FluentApiClient
+
+    AbstractApiClient -->|"builds client"| Factory
+    DefaultApiClient -->|"builds client"| Factory
+    AsyncApiClient -->|"builds client"| Factory
+    FluentApiClient -->|"builds client"| Factory
+
+    Factory -->|creates| RCInterface
+    RCInterface -->|"executes"| DefaultHttpClient
+    RCInterface -->|"executes"| AsyncHttpClient
+    RCInterface -->|"wraps"| CircuitBreakerClient
+    RCInterface -->|"mockable"| MockRocketClient
+
+    CircuitBreakerClient -->|"decorates"| DefaultHttpClient
+    CircuitBreakerClient -->|"decorates"| AsyncHttpClient
+
+    Factory -->|"selects strategy"| AuthFactory
+    AuthFactory -->|"provides"| BasicAuthStrategy
+    AuthFactory -->|"provides"| BearerTokenStrategy
+    AuthFactory -->|"provides"| NoAuthStrategy
+    AuthFactory -->|"provides"| AbstractOAuth2
+    AbstractOAuth2 -->|"extends"| OAuth2AssertionStrategy
+    AbstractOAuth2 -->|"extends"| OAuth2ClientCredStrategy
+    AbstractOAuth2 -->|"extends"| OAuth2PasswordStrategy
+
+    DefaultApiClient -->|uses| RequestBuilder
+    AsyncApiClient -->|uses| RequestBuilder
+    FluentApiClient -->|uses| RequestBuilder
+    RequestBuilder -->|defines| RequestSpec
+    RequestBuilder -->|injects auth| AuthFactory
+
+    DefaultHttpClient -->|serializes| JsonObjectMapper
+    AsyncHttpClient -->|serializes| JsonObjectMapper
+    JsonObjectMapper -->|maps to| Result
+    JsonObjectMapper -->|maps errors to| ApiError
+
+    DefaultHttpClient -->|logs| ResponseLogger
+    DefaultHttpClient -->|streams| StreamUtils
+
+    classDef facade fill:#BBDEFB,stroke:#000;
+    classDef core fill:#C8E6C9,stroke:#000;
+    classDef transport fill:#FFE0B2,stroke:#000;
+    classDef strategy fill:#FFF9C4,stroke:#000;
+    classDef utils fill:#CFD8DC,stroke:#000;
+
+    click RocketRest "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/RocketRest.java"
+    click Config "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/RocketRestConfig.java"
+    click Options "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/RocketRestOptions.java"
+    click SecureConfig "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/RocketRestSecureConfig.java"
+    click Factory "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/http/RocketClientFactory.java"
+    click AbstractApiClient "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/api/AbstractApiClient.java"
+    click DefaultApiClient "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/api/DefaultApiClient.java"
+    click AsyncApiClient "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/api/AsyncApiClient.java"
+    click FluentApiClient "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/api/FluentApiClient.java"
+    click RCInterface "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/http/RocketClient.java"
+    click DefaultHttpClient "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/http/DefaultHttpClient.java"
+    click AsyncHttpClient "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/http/AsyncHttpClient.java"
+    click CircuitBreakerClient "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/http/CircuitBreakerClient.java"
+    click MockRocketClient "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/http/MockRocketClient.java"
+    click AuthFactory "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/auth/AuthStrategyFactory.java"
+    click BasicAuthStrategy "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/auth/BasicAuthStrategy.java"
+    click BearerTokenStrategy "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/auth/BearerTokenStrategy.java"
+    click NoAuthStrategy "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/auth/NoAuthStrategy.java"
+    click AbstractOAuth2 "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/auth/AbstractOAuth2Strategy.java"
+    click OAuth2AssertionStrategy "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/auth/OAuth2AssertionStrategy.java"
+    click OAuth2ClientCredStrategy "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/auth/OAuth2ClientCredentialsStrategy.java"
+    click OAuth2PasswordStrategy "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/auth/OAuth2PasswordStrategy.java"
+    click JsonObjectMapper "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/json/JsonObjectMapper.java"
+    click RequestBuilder "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/request/RequestBuilder.java"
+    click RequestSpec "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/request/RequestSpec.java"
+    click Result "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/result/Result.java"
+    click ApiError "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/result/ApiError.java"
+    click ResponseLogger "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/util/ResponseLogger.java"
+    click StreamUtils "https://github.com/guinetik/rocketrest/blob/master/rocketrest-core/src/main/java/com/guinetik/rr/util/StreamUtils.java"
+    click Examples "https://github.com/guinetik/rocketrest/tree/master/examples/src/main/java/com/guinetik/examples/"
+```
+
 ## Configuration vs. Options
 
 RocketRest makes a conceptual distinction between **configuration** and **options**:
