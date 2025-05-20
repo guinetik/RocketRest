@@ -9,8 +9,8 @@ import java.util.Map;
  * Represents the specification of an API request, including endpoint, method,
  * query parameters, headers, body, and response type.
  *
- * @param <Req>> The type of the request body
- * @param <Res>> The type of the response
+ * @param Req The type of the request body
+ * @param Res The type of the response
  */
 public class RequestSpec<Req, Res> {
     private final String endpoint;

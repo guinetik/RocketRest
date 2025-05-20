@@ -210,7 +210,7 @@ public class Result<T, E> {
     /**
      * Pattern-matches over this Result, executing one of the consumers depending on success/failure.
      * <pre>
-     * result.match(value -> System.out.println(value), err -> log.error(err));
+     * result.match(value -&gt; System.out.println(value), err -&gt; log.error(err));
      * </pre>
      *
      * @param successConsumer runs if this result is a success (receives the value)
