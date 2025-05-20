@@ -46,7 +46,7 @@ public class CircuitBreakerClient implements RocketClient {
     public enum FailurePolicy {
         /** Counts all exceptions as failures */
         ALL_EXCEPTIONS,
-        /** Only count status codes >= {@link HttpConstants.StatusCodes#SERVER_ERROR_MIN} (500) */
+        /** Only count status codes {@link HttpConstants.StatusCodes#SERVER_ERROR_MIN} (500) */
         SERVER_ERRORS_ONLY,
         /** Exclude status codes in range {@link HttpConstants.StatusCodes#CLIENT_ERROR_MIN} (400) to 
             {@link HttpConstants.StatusCodes#CLIENT_ERROR_MAX} (499) */
