@@ -2,18 +2,12 @@ package com.guinetik.examples;
 
 import com.guinetik.rr.RocketRest;
 import com.guinetik.rr.RocketRestConfig;
-import com.guinetik.rr.RocketRestOptions;
-import com.guinetik.rr.http.CircuitBreakerClient;
 import com.guinetik.rr.http.CircuitBreakerOpenException;
 import com.guinetik.rr.http.HttpConstants;
-import com.guinetik.rr.http.RocketClient;
-import com.guinetik.rr.http.RocketClientFactory;
 import com.guinetik.rr.result.ApiError;
 import com.guinetik.rr.result.Result;
 
 import java.time.LocalDateTime;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Example demonstrating the Circuit Breaker pattern using RocketRest
