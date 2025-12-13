@@ -6,6 +6,7 @@ import com.guinetik.rr.result.ApiError;
 import com.guinetik.rr.result.Result;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -14,13 +15,17 @@ import static org.junit.Assert.*;
  * Integration test for the Circuit Breaker functionality using a real HTTP client
  * against httpstat.us service.
  * Note: This test makes real HTTP calls and depends on an external service.
+ *
+ * These tests are ignored by default as they depend on external services and are slow.
+ * Run with: mvn test -Dtest=CircuitBreakerIntegrationTest
  */
+@Ignore("Integration tests - depends on external service. Run explicitly with -Dtest=CircuitBreakerIntegrationTest")
 public class CircuitBreakerIntegrationTest {
 
     private RocketRest client;
-    private static final String API_BASE_URL = "https://httpstat.us";
+    private static final String API_BASE_URL = "https://tools-httpstatus.pickup-services.com/";
     private static final int FAILURE_THRESHOLD = 3;
-    private static final long RESET_TIMEOUT_MS = HttpConstants.Timeouts.QUICK_TIMEOUT; // 5 seconds
+    private static final long RESET_TIMEOUT_MS = 2000; // 2 seconds for faster testing
 
     @Before
     public void setUp() {

@@ -9,8 +9,66 @@ import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 /**
- * Factory for creating and configuring HTTP clients with various decorators and settings.
- * This factory provides a fluent API for building client instances with complex configurations.
+ * Factory for creating and configuring HTTP clients with decorators and settings.
+ *
+ * <p>This factory provides a fluent builder API for constructing {@link RocketClient}
+ * instances with various configurations like circuit breakers, custom decorators,
+ * and async execution support.
+ *
+ * <h2>Simple Client</h2>
+ * <pre class="language-java"><code>
+ * RocketClient client = RocketClientFactory.builder("https://api.example.com")
+ *     .build();
+ * </code></pre>
+ *
+ * <h2>With Circuit Breaker</h2>
+ * <pre class="language-java"><code>
+ * RocketClient client = RocketClientFactory.builder("https://api.example.com")
+ *     .withCircuitBreaker(5, 30000)  // 5 failures, 30s timeout
+ *     .build();
+ * </code></pre>
+ *
+ * <h2>From Configuration</h2>
+ * <pre class="language-java"><code>
+ * RocketRestConfig config = RocketRestConfig.builder("https://api.example.com")
+ *     .authStrategy(AuthStrategyFactory.createBearerToken("token"))
+ *     .build();
+ *
+ * RocketClient client = RocketClientFactory.fromConfig(config)
+ *     .withCircuitBreaker()
+ *     .build();
+ * </code></pre>
+ *
+ * <h2>Async Client</h2>
+ * <pre class="language-java"><code>
+ * ExecutorService executor = Executors.newFixedThreadPool(4);
+ *
+ * AsyncHttpClient asyncClient = RocketClientFactory.builder("https://api.example.com")
+ *     .withExecutorService(executor)
+ *     .buildAsync();
+ * </code></pre>
+ *
+ * <h2>Fluent Client (Result Pattern)</h2>
+ * <pre class="language-java"><code>
+ * FluentHttpClient fluentClient = RocketClientFactory.builder("https://api.example.com")
+ *     .buildFluent();
+ *
+ * Result&lt;User, ApiError&gt; result = fluentClient.executeWithResult(request);
+ * </code></pre>
+ *
+ * <h2>Custom Decorator</h2>
+ * <pre class="language-java"><code>
+ * RocketClient client = RocketClientFactory.builder("https://api.example.com")
+ *     .withCircuitBreaker()
+ *     .withCustomDecorator(base -&gt; new LoggingClientDecorator(base))
+ *     .build();
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see RocketClient
+ * @see CircuitBreakerClient
+ * @see FluentHttpClient
+ * @since 1.0.0
  */
 public class RocketClientFactory {
 

@@ -5,8 +5,43 @@ import com.guinetik.rr.http.RocketClient;
 import com.guinetik.rr.http.RocketClientFactory;
 
 /**
- * Default implementation of an API client that uses a synchronous HTTP client.
- * This class extends AbstractHttpClient and handles token refresh and SSL configuration.
+ * Default synchronous API client implementation.
+ *
+ * <p>This client executes HTTP requests synchronously, blocking the calling thread
+ * until the response is received. It's the simplest way to interact with REST APIs
+ * when you don't need asynchronous processing.
+ *
+ * <h2>Basic Usage</h2>
+ * <pre class="language-java"><code>
+ * RocketRestConfig config = RocketRestConfig.builder("https://api.example.com")
+ *     .authStrategy(AuthStrategyFactory.createBearerToken("token"))
+ *     .build();
+ *
+ * DefaultApiClient client = new DefaultApiClient("https://api.example.com", config);
+ *
+ * // Execute a GET request (blocks until response)
+ * RequestSpec&lt;Void, User&gt; request = RequestBuilder.get("/users/1")
+ *     .responseType(User.class)
+ *     .build();
+ *
+ * User user = client.execute(request);
+ * </code></pre>
+ *
+ * <h2>With Custom HTTP Client</h2>
+ * <pre class="language-java"><code>
+ * // Create client with circuit breaker
+ * RocketClient httpClient = RocketClientFactory.fromConfig(config)
+ *     .withCircuitBreaker(5, 30000)
+ *     .build();
+ *
+ * DefaultApiClient client = new DefaultApiClient(baseUrl, config, httpClient);
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see AbstractApiClient
+ * @see AsyncApiClient
+ * @see FluentApiClient
+ * @since 1.0.0
  */
 public class DefaultApiClient extends AbstractApiClient {
 

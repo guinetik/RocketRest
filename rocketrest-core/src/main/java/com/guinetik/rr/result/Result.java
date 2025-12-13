@@ -7,12 +7,81 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * A container object which may contain either a result value (success) or an error.
- * Similar to Rust's Result or Scala's Either type, this class provides a way to
- * handle errors without exceptions.
+ * A container object representing either a successful result or an error.
  *
- * @param <T> The type of the value contained in this Result
- * @param <E> The type of the error contained in this Result
+ * <p>Inspired by Rust's {@code Result<T, E>} and Scala's {@code Either[L, R]}, this class
+ * provides a functional approach to error handling without exceptions. It forces explicit
+ * handling of both success and failure cases, leading to more robust code.
+ *
+ * <h2>Creating Results</h2>
+ * <pre class="language-java"><code>
+ * // Success case
+ * Result&lt;User, ApiError&gt; success = Result.success(new User("John"));
+ *
+ * // Failure case
+ * Result&lt;User, ApiError&gt; failure = Result.failure(new ApiError(404, "Not found"));
+ * </code></pre>
+ *
+ * <h2>Checking and Extracting Values</h2>
+ * <pre class="language-java"><code>
+ * Result&lt;User, ApiError&gt; result = client.fluent().get("/users/1", User.class);
+ *
+ * if (result.isSuccess()) {
+ *     User user = result.getValue();
+ *     System.out.println("Found: " + user.getName());
+ * } else {
+ *     ApiError error = result.getError();
+ *     System.err.println("Error: " + error.getMessage());
+ * }
+ * </code></pre>
+ *
+ * <h2>Pattern Matching with match()</h2>
+ * <pre class="language-java"><code>
+ * result.match(
+ *     user -&gt; System.out.println("Success: " + user.getName()),
+ *     error -&gt; System.err.println("Failed: " + error.getMessage())
+ * );
+ * </code></pre>
+ *
+ * <h2>Functional Transformations</h2>
+ * <pre class="language-java"><code>
+ * // Transform the success value
+ * Result&lt;String, ApiError&gt; nameResult = result.map(user -&gt; user.getName());
+ *
+ * // Transform the error
+ * Result&lt;User, String&gt; stringError = result.mapError(err -&gt; err.getMessage());
+ *
+ * // Chain operations
+ * String name = result
+ *     .map(User::getName)
+ *     .map(String::toUpperCase)
+ *     .getOrElse("Unknown");
+ * </code></pre>
+ *
+ * <h2>Safe Value Extraction</h2>
+ * <pre class="language-java"><code>
+ * // With default value
+ * User user = result.getOrElse(User.anonymous());
+ *
+ * // With lazy default
+ * User user = result.getOrElseGet(() -&gt; loadDefaultUser());
+ *
+ * // Throw on failure
+ * User user = result.getOrElseThrow(() -&gt; new UserNotFoundException());
+ *
+ * // Unwrap (throws RuntimeException on failure)
+ * User user = result.unwrap();
+ *
+ * // Convert to Optional
+ * Optional&lt;User&gt; optional = result.toOptional();
+ * </code></pre>
+ *
+ * @param <T> the type of the success value
+ * @param <E> the type of the error value
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see com.guinetik.rr.RocketRest.FluentApi
+ * @see ApiError
+ * @since 1.0.0
  */
 public class Result<T, E> {
 

@@ -11,8 +11,50 @@ import com.guinetik.rr.result.Result;
 import java.util.Map;
 
 /**
- * A fluent API client that uses the Result pattern instead of exceptions.
- * This provides a more declarative way to handle API calls.
+ * A fluent API client that uses the {@link Result} pattern instead of exceptions.
+ *
+ * <p>This client provides a functional, declarative approach to API calls where errors
+ * are returned as values rather than thrown as exceptions. This makes error handling
+ * explicit and composable.
+ *
+ * <h2>Basic Usage</h2>
+ * <pre class="language-java"><code>
+ * FluentApiClient client = new FluentApiClient("https://api.example.com", config);
+ *
+ * Result&lt;User, ApiError&gt; result = client.get("/users/1", User.class);
+ *
+ * // Handle success and failure explicitly
+ * result.match(
+ *     user -&gt; System.out.println("Found: " + user.getName()),
+ *     error -&gt; System.err.println("Error " + error.getStatusCode() + ": " + error.getMessage())
+ * );
+ * </code></pre>
+ *
+ * <h2>Chaining Operations</h2>
+ * <pre class="language-java"><code>
+ * String userName = client.get("/users/1", User.class)
+ *     .map(User::getName)
+ *     .map(String::toUpperCase)
+ *     .getOrElse("Unknown");
+ * </code></pre>
+ *
+ * <h2>POST with Body</h2>
+ * <pre class="language-java"><code>
+ * CreateUserRequest request = new CreateUserRequest("John", "john@example.com");
+ *
+ * Result&lt;User, ApiError&gt; result = client.post("/users", request, User.class);
+ *
+ * if (result.isSuccess()) {
+ *     User created = result.getValue();
+ *     System.out.println("Created user with ID: " + created.getId());
+ * }
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see Result
+ * @see ApiError
+ * @see AbstractApiClient
+ * @since 1.0.0
  */
 public class FluentApiClient extends AbstractApiClient {
 

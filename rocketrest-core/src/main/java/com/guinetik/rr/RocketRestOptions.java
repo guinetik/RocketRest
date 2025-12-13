@@ -5,8 +5,52 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Configuration options for API clients.
- * Provides a centralized place for all configurable options across different client implementations.
+ * Configuration options for RocketRest API clients.
+ *
+ * <p>This class provides a type-safe, centralized container for all configurable options
+ * across different client implementations. Options are stored as key-value pairs and
+ * can be retrieved with type-specific methods.
+ *
+ * <h2>Available Options</h2>
+ * <table border="1">
+ *   <tr><th>Option</th><th>Type</th><th>Default</th><th>Description</th></tr>
+ *   <tr><td>{@link #RETRY_ENABLED}</td><td>Boolean</td><td>true</td><td>Enable automatic retry on failure</td></tr>
+ *   <tr><td>{@link #MAX_RETRIES}</td><td>Integer</td><td>3</td><td>Maximum number of retry attempts</td></tr>
+ *   <tr><td>{@link #RETRY_DELAY}</td><td>Long</td><td>1000</td><td>Delay between retries in milliseconds</td></tr>
+ *   <tr><td>{@link #LOGGING_ENABLED}</td><td>Boolean</td><td>true</td><td>Enable request/response logging</td></tr>
+ *   <tr><td>{@link #LOG_REQUEST_BODY}</td><td>Boolean</td><td>false</td><td>Log request body content</td></tr>
+ *   <tr><td>{@link #LOG_RESPONSE_BODY}</td><td>Boolean</td><td>false</td><td>Log response body content</td></tr>
+ *   <tr><td>{@link #ASYNC_POOL_SIZE}</td><td>Integer</td><td>4</td><td>Thread pool size for async operations</td></tr>
+ * </table>
+ *
+ * <h2>Usage</h2>
+ * <pre class="language-java"><code>
+ * // Configure via RocketRestConfig builder
+ * RocketRestConfig config = RocketRestConfig.builder("https://api.example.com")
+ *     .defaultOptions(options -&gt; {
+ *         options.set(RocketRestOptions.RETRY_ENABLED, true);
+ *         options.set(RocketRestOptions.MAX_RETRIES, 5);
+ *         options.set(RocketRestOptions.LOG_REQUEST_BODY, true);
+ *     })
+ *     .build();
+ *
+ * // Or configure directly on client
+ * RocketRest client = new RocketRest(config);
+ * client.configure(RocketRestOptions.RETRY_DELAY, 2000L);
+ * </code></pre>
+ *
+ * <h2>Reading Options</h2>
+ * <pre class="language-java"><code>
+ * RocketRestOptions options = new RocketRestOptions();
+ * boolean retryEnabled = options.getBoolean(RocketRestOptions.RETRY_ENABLED, false);
+ * int maxRetries = options.getInt(RocketRestOptions.MAX_RETRIES, 3);
+ * long delay = options.getLong(RocketRestOptions.RETRY_DELAY, 1000L);
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see RocketRestConfig
+ * @see RocketRest#configure(String, Object)
+ * @since 1.0.0
  */
 public class RocketRestOptions {
     // Common options

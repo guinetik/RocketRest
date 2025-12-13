@@ -1,8 +1,55 @@
 package com.guinetik.rr.result;
 
 /**
- * Represents an API error in the Result pattern.
- * This class encapsulates information about API errors without using exceptions.
+ * Represents an API error in the {@link Result} pattern.
+ *
+ * <p>This class encapsulates information about API errors without using exceptions,
+ * providing a functional approach to error handling. It includes the error message,
+ * HTTP status code (when applicable), response body, and error type classification.
+ *
+ * <h2>Error Types</h2>
+ * <ul>
+ *   <li>{@link ErrorType#HTTP_ERROR} - Server returned an error status code</li>
+ *   <li>{@link ErrorType#NETWORK_ERROR} - Connection or network failure</li>
+ *   <li>{@link ErrorType#PARSE_ERROR} - Failed to parse response body</li>
+ *   <li>{@link ErrorType#AUTH_ERROR} - Authentication/authorization failure</li>
+ *   <li>{@link ErrorType#CONFIG_ERROR} - Client misconfiguration</li>
+ *   <li>{@link ErrorType#CIRCUIT_OPEN} - Circuit breaker is open</li>
+ * </ul>
+ *
+ * <h2>Creating Errors</h2>
+ * <pre class="language-java"><code>
+ * // HTTP error with status code
+ * ApiError notFound = ApiError.httpError("User not found", 404, responseBody);
+ *
+ * // Network error
+ * ApiError networkError = ApiError.networkError("Connection refused");
+ *
+ * // Parse error
+ * ApiError parseError = ApiError.parseError("Invalid JSON", responseBody);
+ * </code></pre>
+ *
+ * <h2>Handling Errors</h2>
+ * <pre class="language-java"><code>
+ * Result&lt;User, ApiError&gt; result = client.fluent().get("/users/1", User.class);
+ *
+ * result.ifFailure(error -&gt; {
+ *     if (error.isType(ErrorType.HTTP_ERROR)) {
+ *         if (error.hasStatusCode(404)) {
+ *             System.out.println("User not found");
+ *         } else if (error.hasStatusCode(500)) {
+ *             System.out.println("Server error");
+ *         }
+ *     } else if (error.isType(ErrorType.NETWORK_ERROR)) {
+ *         System.out.println("Check your connection");
+ *     }
+ * });
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see Result
+ * @see com.guinetik.rr.api.FluentApiClient
+ * @since 1.0.0
  */
 public class ApiError {
     private final String message;

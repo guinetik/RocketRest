@@ -13,8 +13,48 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 
 /**
- * Abstract base class for API clients that provides common HTTP request handling.
- * This class is agnostic to the actual HTTP client implementation.
+ * Abstract base class for API clients providing common HTTP request handling.
+ *
+ * <p>This class serves as the foundation for all API client implementations in RocketRest.
+ * It provides:
+ * <ul>
+ *   <li>Automatic token refresh on expiration</li>
+ *   <li>Configurable retry logic with exponential backoff</li>
+ *   <li>Request/response timing and logging</li>
+ *   <li>Header management including authentication</li>
+ * </ul>
+ *
+ * <p>Concrete implementations include:
+ * <ul>
+ *   <li>{@link DefaultApiClient} - Synchronous blocking requests</li>
+ *   <li>{@link AsyncApiClient} - Asynchronous requests with {@link java.util.concurrent.CompletableFuture}</li>
+ *   <li>{@link FluentApiClient} - Functional style with {@link com.guinetik.rr.result.Result} pattern</li>
+ * </ul>
+ *
+ * <h2>Request Execution Flow</h2>
+ * <pre class="language-java"><code>
+ * // 1. Create request specification
+ * RequestSpec&lt;Void, User&gt; request = RequestBuilder.get("/users/1")
+ *     .responseType(User.class)
+ *     .build();
+ *
+ * // 2. Execute with automatic retry and timing
+ * User user = client.execute(request);
+ * </code></pre>
+ *
+ * <h2>Configuration</h2>
+ * <pre class="language-java"><code>
+ * // Configure client options
+ * client.configure(RocketRestOptions.RETRY_ENABLED, true);
+ * client.configure(RocketRestOptions.MAX_RETRIES, 5);
+ * client.configure(RocketRestOptions.LOG_REQUEST_BODY, true);
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see DefaultApiClient
+ * @see AsyncApiClient
+ * @see FluentApiClient
+ * @since 1.0.0
  */
 public abstract class AbstractApiClient {
     protected final Logger logger = LoggerFactory.getLogger(this.getClass());

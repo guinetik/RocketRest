@@ -3,8 +3,8 @@ package com.guinetik.rr.auth;
 import com.guinetik.rr.http.RocketHeaders;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mockito;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.time.Instant;
@@ -13,9 +13,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.Assert.*;
-import static org.mockito.ArgumentMatchers.anyMap;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for {@link OAuth2AssertionStrategy}.
@@ -30,9 +27,42 @@ public class OAuth2AssertionStrategyTest {
     private static final String ASSERTION_URL = "https://assertion.example.com/token";
     private static final String TOKEN_URL = "https://auth.example.com/token";
     private static final String TEST_ASSERTION = "test-assertion-value";
-    
+
     private OAuth2AssertionStrategy strategy;
-    
+
+    /**
+     * Testable subclass that allows overriding the post method for testing.
+     */
+    private static class TestableOAuth2AssertionStrategy extends OAuth2AssertionStrategy {
+        private String postResponse = "";
+        private String lastPostUrl;
+        private Map<String, String> lastPostParams;
+
+        public TestableOAuth2AssertionStrategy(String clientId, String userId, String privateKey,
+                                                String companyId, String grantType, String assertionUrl, String tokenUrl) {
+            super(clientId, userId, privateKey, companyId, grantType, assertionUrl, tokenUrl);
+        }
+
+        @Override
+        protected String post(String url, Map<String, String> formParams) throws IOException {
+            this.lastPostUrl = url;
+            this.lastPostParams = new HashMap<>(formParams);
+            return postResponse;
+        }
+
+        public void setPostResponse(String response) {
+            this.postResponse = response;
+        }
+
+        public String getLastPostUrl() {
+            return lastPostUrl;
+        }
+
+        public Map<String, String> getLastPostParams() {
+            return lastPostParams;
+        }
+    }
+
     @Before
     public void setUp() {
         strategy = new OAuth2AssertionStrategy(
@@ -140,65 +170,59 @@ public class OAuth2AssertionStrategyTest {
     }
     
     @Test
-    public void testRefreshCredentialsWithEmptyAssertion() throws Exception {
-        // Create a spy to intercept the post calls
-        OAuth2AssertionStrategy spyStrategy = Mockito.spy(strategy);
-        
-        // Make the post method return an empty string when called with the assertion URL
-        doReturn("").when(spyStrategy).post(eq(ASSERTION_URL), anyMap());
-        
+    public void testRefreshCredentialsWithEmptyAssertion() {
+        // Create testable strategy with empty response
+        TestableOAuth2AssertionStrategy testStrategy = new TestableOAuth2AssertionStrategy(
+            CLIENT_ID, USER_ID, PRIVATE_KEY, COMPANY_ID, GRANT_TYPE, ASSERTION_URL, TOKEN_URL);
+        testStrategy.setPostResponse("");
+
         // Call refreshCredentials
-        boolean result = spyStrategy.refreshCredentials();
-        
+        boolean result = testStrategy.refreshCredentials();
+
         // Verify the expected behavior
         assertFalse(result);
-        
+
         // Verify that post was called with assertion URL
-        verify(spyStrategy).post(eq(ASSERTION_URL), anyMap());
+        assertEquals(ASSERTION_URL, testStrategy.getLastPostUrl());
     }
-    
+
     @Test
     public void testGetAssertion() throws Exception {
-        // Create a spy to intercept the post calls
-        OAuth2AssertionStrategy spyStrategy = Mockito.spy(strategy);
-        
-        // Make the post method return our test assertion when called with the assertion URL
-        doReturn(TEST_ASSERTION).when(spyStrategy).post(eq(ASSERTION_URL), anyMap());
-        
+        // Create testable strategy
+        TestableOAuth2AssertionStrategy testStrategy = new TestableOAuth2AssertionStrategy(
+            CLIENT_ID, USER_ID, PRIVATE_KEY, COMPANY_ID, GRANT_TYPE, ASSERTION_URL, TOKEN_URL);
+        testStrategy.setPostResponse(TEST_ASSERTION);
+
         // Call getAssertion via reflection
         Method getAssertionMethod = OAuth2AssertionStrategy.class.getDeclaredMethod("getAssertion");
         getAssertionMethod.setAccessible(true);
-        String assertion = (String) getAssertionMethod.invoke(spyStrategy);
-        
+        String assertion = (String) getAssertionMethod.invoke(testStrategy);
+
         // Verify the expected behavior
         assertEquals(TEST_ASSERTION, assertion);
-        
+
         // Verify post was called with the correct parameters
-        verify(spyStrategy).post(eq(ASSERTION_URL), argThat(map -> 
-            CLIENT_ID.equals(map.get("client_id")) &&
-            USER_ID.equals(map.get("user_id")) &&
-            TOKEN_URL.equals(map.get("token_url")) &&
-            PRIVATE_KEY.equals(map.get("private_key"))
-        ));
+        Map<String, String> params = testStrategy.getLastPostParams();
+        assertEquals(CLIENT_ID, params.get("client_id"));
+        assertEquals(USER_ID, params.get("user_id"));
+        assertEquals(TOKEN_URL, params.get("token_url"));
+        assertEquals(PRIVATE_KEY, params.get("private_key"));
     }
     
     @Test
     public void testApplyAuthHeadersWithToken() {
-        // Setup: create a mock to test the inherited applyAuthHeaders method
-        OAuth2AssertionStrategy spyStrategy = Mockito.spy(strategy);
-        
-        // Set an access token via reflection
+        // Set an access token via reflection on the actual strategy (no spy needed)
         try {
             Field accessTokenField = AbstractOAuth2Strategy.class.getDeclaredField("accessToken");
             accessTokenField.setAccessible(true);
-            accessTokenField.set(spyStrategy, "test-token");
+            accessTokenField.set(strategy, "test-token");
         } catch (Exception e) {
             fail("Could not set access token field: " + e.getMessage());
         }
-        
+
         RocketHeaders headers = new RocketHeaders();
-        spyStrategy.applyAuthHeaders(headers);
-        
+        strategy.applyAuthHeaders(headers);
+
         assertTrue(headers.contains(RocketHeaders.Names.AUTHORIZATION));
         assertEquals("Bearer test-token", headers.get(RocketHeaders.Names.AUTHORIZATION));
     }

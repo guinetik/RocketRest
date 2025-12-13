@@ -5,6 +5,7 @@ import com.guinetik.rr.result.ApiError;
 import com.guinetik.rr.result.Result;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.time.Duration;
@@ -20,11 +21,15 @@ import static org.junit.Assert.*;
 /**
  * Performance profiling tests for RocketRest
  * Tests HTTP request latency using https://httpstat.us service.
+ *
+ * These tests are ignored by default as they depend on external services and are slow.
+ * Run with: mvn test -Dtest=PerformanceProfilingTest
  */
+@Ignore("Performance tests - depends on external service. Run explicitly with -Dtest=PerformanceProfilingTest")
 public class PerformanceProfilingTest {
     
     private RocketRest client;
-    private static final String API_BASE_URL = "https://httpstat.us";
+    private static final String API_BASE_URL = "https://tools-httpstatus.pickup-services.com/";
     private static final int DEFAULT_SAMPLE_SIZE = 10;
     private static final int WARM_UP_REQUESTS = 3;
     private static final int DIRECT_COMPARISON_SAMPLES = 50; // More samples for direct comparison

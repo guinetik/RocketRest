@@ -4,6 +4,30 @@ import com.guinetik.rr.http.RocketHeaders;
 
 /**
  * Authentication strategy that uses HTTP Basic authentication.
+ *
+ * <p>This strategy adds an {@code Authorization: Basic <base64>} header to all requests,
+ * where the base64 value is the encoded {@code username:password} string.
+ *
+ * <h2>Usage</h2>
+ * <pre class="language-java"><code>
+ * // Create via factory (recommended)
+ * AuthStrategy auth = AuthStrategyFactory.createBasicAuth("username", "password");
+ *
+ * // Configure client
+ * RocketRestConfig config = RocketRestConfig.builder("https://api.example.com")
+ *     .authStrategy(auth)
+ *     .build();
+ *
+ * RocketRest client = new RocketRest(config);
+ * </code></pre>
+ *
+ * <p><b>Security Note:</b> Basic authentication transmits credentials in base64 encoding
+ * (not encryption). Always use HTTPS when using basic authentication.
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see AuthStrategy
+ * @see AuthStrategyFactory#createBasicAuth(String, String)
+ * @since 1.0.0
  */
 public class BasicAuthStrategy implements AuthStrategy {
 

@@ -6,7 +6,57 @@ import com.guinetik.rr.auth.AuthStrategyFactory;
 import java.util.function.Consumer;
 
 /**
- * Configuration for the RocketRest client.
+ * Configuration container for {@link RocketRest} clients.
+ *
+ * <p>This class holds all configuration options needed to create a RocketRest client,
+ * including the service URL, authentication strategy, and default request options.
+ * Use the fluent {@link Builder} to construct instances.
+ *
+ * <h2>Basic Usage</h2>
+ * <pre class="language-java"><code>
+ * RocketRestConfig config = RocketRestConfig.builder("https://api.example.com")
+ *     .build();
+ *
+ * RocketRest client = new RocketRest(config);
+ * </code></pre>
+ *
+ * <h2>With Authentication</h2>
+ * <pre class="language-java"><code>
+ * RocketRestConfig config = RocketRestConfig.builder("https://api.example.com")
+ *     .authStrategy(AuthStrategyFactory.createBearerToken("my-api-token"))
+ *     .build();
+ * </code></pre>
+ *
+ * <h2>With Default Options</h2>
+ * <pre class="language-java"><code>
+ * RocketRestConfig config = RocketRestConfig.builder("https://api.example.com")
+ *     .authStrategy(AuthStrategyFactory.createBasicAuth("user", "pass"))
+ *     .defaultOptions(options -&gt; {
+ *         options.set(RocketRestOptions.RETRY_ENABLED, true);
+ *         options.set(RocketRestOptions.MAX_RETRIES, 3);
+ *         options.set(RocketRestOptions.CONNECT_TIMEOUT, 5000);
+ *         options.set(RocketRestOptions.LOG_REQUEST_BODY, true);
+ *     })
+ *     .build();
+ * </code></pre>
+ *
+ * <h2>OAuth2 Client Credentials</h2>
+ * <pre class="language-java"><code>
+ * RocketRestConfig config = RocketRestConfig.builder("https://api.example.com")
+ *     .tokenUrl("https://auth.example.com/oauth/token")
+ *     .authStrategy(AuthStrategyFactory.createOAuth2ClientCredentials(
+ *         "https://auth.example.com/oauth/token",
+ *         "client-id",
+ *         "client-secret"
+ *     ))
+ *     .build();
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see RocketRest
+ * @see RocketRestOptions
+ * @see com.guinetik.rr.auth.AuthStrategy
+ * @since 1.0.0
  */
 public class RocketRestConfig {
 

@@ -18,20 +18,61 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Client for interacting with REST APIs in a structured and reusable manner.
- * Uses composition to leverage different API client implementations through a clean interface-based API.
- * <p>
- * Example usage:
- * <pre>
- * // Synchronous API
- * Todo todo = rocketRest.sync().get("/todos/1", Todo.class);
- * 
- * // Asynchronous API
- * CompletableFuture&lt;Todo&gt; future = rocketRest.async().get("/todos/1", Todo.class);
- * 
- * // Fluent API with Result pattern
- * Result&lt;Todo, ApiError&gt; result = rocketRest.fluent().get("/todos/1", Todo.class);
- * </pre>
+ * Main entry point for interacting with REST APIs using RocketRest.
+ *
+ * <p>This class provides a unified facade for making HTTP requests with three different API styles:
+ * <ul>
+ *   <li><b>Synchronous API</b> - Traditional blocking calls via {@link #sync()}</li>
+ *   <li><b>Asynchronous API</b> - Non-blocking calls with {@link CompletableFuture} via {@link #async()}</li>
+ *   <li><b>Fluent API</b> - Functional error handling with {@link Result} pattern via {@link #fluent()}</li>
+ * </ul>
+ *
+ * <h2>Quick Start</h2>
+ * <pre class="language-java"><code>
+ * // Create a client with simple URL
+ * RocketRest client = new RocketRest("https://api.example.com");
+ *
+ * // Make a GET request
+ * User user = client.get("/users/1", User.class);
+ *
+ * // Don't forget to shutdown when done
+ * client.shutdown();
+ * </code></pre>
+ *
+ * <h2>Using Different API Styles</h2>
+ * <pre class="language-java"><code>
+ * // Synchronous API - blocks until response
+ * Todo todo = client.sync().get("/todos/1", Todo.class);
+ *
+ * // Asynchronous API - returns CompletableFuture
+ * CompletableFuture&lt;Todo&gt; future = client.async().get("/todos/1", Todo.class);
+ * future.thenAccept(t -&gt; System.out.println(t.getTitle()));
+ *
+ * // Fluent API with Result pattern - no exceptions
+ * Result&lt;Todo, ApiError&gt; result = client.fluent().get("/todos/1", Todo.class);
+ * result.match(
+ *     todo -&gt; System.out.println("Success: " + todo.getTitle()),
+ *     error -&gt; System.err.println("Error: " + error.getMessage())
+ * );
+ * </code></pre>
+ *
+ * <h2>Configuration</h2>
+ * <pre class="language-java"><code>
+ * RocketRestConfig config = RocketRestConfig.builder("https://api.example.com")
+ *     .authStrategy(AuthStrategyFactory.createBearerToken("my-token"))
+ *     .defaultOptions(opts -&gt; {
+ *         opts.set(RocketRestOptions.RETRY_ENABLED, true);
+ *         opts.set(RocketRestOptions.MAX_RETRIES, 3);
+ *     })
+ *     .build();
+ *
+ * RocketRest client = new RocketRest(config);
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see RocketRestConfig
+ * @see Result
+ * @since 1.0.0
  */
 public class RocketRest {
 

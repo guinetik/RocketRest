@@ -3,8 +3,54 @@ package com.guinetik.rr.http;
 import com.guinetik.rr.request.RequestSpec;
 
 /**
- * Interface for HTTP request clients. This abstraction allows for different
- * HTTP client implementations while maintaining a consistent API.
+ * Core interface for HTTP request execution in RocketRest.
+ *
+ * <p>This abstraction allows different HTTP client implementations while maintaining
+ * a consistent API. The default implementation uses Java's {@code HttpURLConnection},
+ * but custom implementations can be provided.
+ *
+ * <h2>Implementations</h2>
+ * <ul>
+ *   <li>{@link DefaultHttpClient} - Synchronous client using HttpURLConnection</li>
+ *   <li>{@link AsyncHttpClient} - Wraps any RocketClient for async execution</li>
+ *   <li>{@link FluentHttpClient} - Returns {@link com.guinetik.rr.result.Result} instead of exceptions</li>
+ *   <li>{@link CircuitBreakerClient} - Decorator adding circuit breaker resilience</li>
+ *   <li>{@link MockRocketClient} - For testing without real HTTP calls</li>
+ * </ul>
+ *
+ * <h2>Creating Clients</h2>
+ * <pre class="language-java"><code>
+ * // Via factory (recommended)
+ * RocketClient client = RocketClientFactory.builder("https://api.example.com")
+ *     .withOptions(options)
+ *     .withCircuitBreaker(5, 30000)
+ *     .build();
+ *
+ * // Execute request
+ * RequestSpec&lt;Void, User&gt; request = RequestBuilder.get("/users/1")
+ *     .responseType(User.class)
+ *     .build();
+ *
+ * User user = client.execute(request);
+ * </code></pre>
+ *
+ * <h2>Custom Implementation</h2>
+ * <pre class="language-java"><code>
+ * public class OkHttpRocketClient implements RocketClient {
+ *     private final OkHttpClient okHttp = new OkHttpClient();
+ *
+ *     {@literal @}Override
+ *     public &lt;Req, Res&gt; Res execute(RequestSpec&lt;Req, Res&gt; spec) {
+ *         // Implement using OkHttp
+ *     }
+ *     // ... other methods
+ * }
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see RocketClientFactory
+ * @see DefaultHttpClient
+ * @since 1.0.0
  */
 public interface RocketClient {
     

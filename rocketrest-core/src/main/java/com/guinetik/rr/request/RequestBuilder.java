@@ -6,10 +6,54 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Builder class for constructing {@link RequestSpec} instances.
+ * Fluent builder for constructing {@link RequestSpec} instances.
  *
- * @param <Req> The type of the request body.
- * @param <Res> The type of the response.
+ * <p>This builder provides a clean, type-safe API for creating HTTP request specifications
+ * with all necessary parameters like endpoint, method, headers, body, and response type.
+ *
+ * <h2>Static Factory Methods</h2>
+ * <pre class="language-java"><code>
+ * // GET request
+ * RequestSpec&lt;Void, User&gt; getUser = RequestBuilder.&lt;Void, User&gt;get("/users/1")
+ *     .responseType(User.class)
+ *     .build();
+ *
+ * // POST request with body
+ * RequestSpec&lt;CreateUser, User&gt; createUser = RequestBuilder.&lt;CreateUser, User&gt;post("/users")
+ *     .body(new CreateUser("John", "john@example.com"))
+ *     .responseType(User.class)
+ *     .build();
+ *
+ * // PUT request
+ * RequestSpec&lt;UpdateUser, User&gt; updateUser = RequestBuilder.&lt;UpdateUser, User&gt;put("/users/1")
+ *     .body(new UpdateUser("John Doe"))
+ *     .responseType(User.class)
+ *     .build();
+ *
+ * // DELETE request
+ * RequestSpec&lt;Void, Void&gt; deleteUser = RequestBuilder.&lt;Void, Void&gt;delete("/users/1")
+ *     .responseType(Void.class)
+ *     .build();
+ * </code></pre>
+ *
+ * <h2>With Headers and Query Params</h2>
+ * <pre class="language-java"><code>
+ * Map&lt;String, String&gt; params = new HashMap&lt;&gt;();
+ * params.put("page", "1");
+ * params.put("limit", "10");
+ *
+ * RequestSpec&lt;Void, UserList&gt; request = RequestBuilder.&lt;Void, UserList&gt;get("/users")
+ *     .queryParams(params)
+ *     .headers(RocketHeaders.defaultJson().set("X-Custom", "value"))
+ *     .responseType(UserList.class)
+ *     .build();
+ * </code></pre>
+ *
+ * @param <Req> the type of the request body
+ * @param <Res> the type of the response
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see RequestSpec
+ * @since 1.0.0
  */
 public class RequestBuilder<Req, Res> {
     private String endpoint;

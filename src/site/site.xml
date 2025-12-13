@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/DECORATION/1.8.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/DECORATION/1.8.0 https://maven.apache.org/xsd/decoration-1.8.0.xsd" name="RocketRest">
+
+    <skin>
+        <groupId>org.apache.maven.skins</groupId>
+        <artifactId>maven-fluido-skin</artifactId>
+        <version>2.0.0-M8</version>
+    </skin>
+
+    <custom>
+        <fluidoSkin>
+            <!-- Modern dark theme - Vercel inspired -->
+            <topBarEnabled>true</topBarEnabled>
+            <sideBarEnabled>false</sideBarEnabled>
+            <topBarIcon>
+                <name>RocketRest</name>
+                <alt>RocketRest</alt>
+                <src>./images/logo.svg</src>
+                <href>/index.html</href>
+            </topBarIcon>
+            <navBarStyle>navbar-dark</navBarStyle>
+            <sourceLineNumbersEnabled>true</sourceLineNumbersEnabled>
+            <skipGenerationDate>true</skipGenerationDate>
+        </fluidoSkin>
+    </custom>
+
+    <bannerLeft>
+        <name>RocketRest</name>
+        <src>./images/logo.svg</src>
+        <width>32</width>
+        <height>28</height>
+        <href>index.html</href>
+    </bannerLeft>
+
+    <body>
+        <head>
+            <![CDATA[
+                <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" rel="stylesheet" />
+                <link href="./css/prism-terminal.css" rel="stylesheet" />
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" defer></script>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js" defer></script>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-xml-doc.min.js" defer></script>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js" defer></script>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js" defer></script>
+                <script src="./js/custom.js" defer></script>
+            ]]>
+        </head>
+        <breadcrumbs>
+            <item name="RocketRest" href="index.html"/>
+        </breadcrumbs>
+
+        <menu name="Overview">
+            <item name="Introduction" href="index.html"/>
+        </menu>
+
+        <menu name="Documentation">
+            <item name="Javadoc" href="apidocs/index.html"/>
+            <item name="Source Code (XRef)" href="examples/index.html"/>
+            <item name="Code Coverage" href="coverage/index.html"/>
+        </menu>
+
+        <menu name="Examples">
+            <item name="Browse All" href="examples/index.html"/>
+            <item name="HelloWorld" href="examples/index.html?path=com/guinetik/examples/HelloWorld.html"/>
+            <item name="Fluent API" href="examples/index.html?path=com/guinetik/examples/FluentApiExample.html"/>
+            <item name="Circuit Breaker" href="examples/index.html?path=com/guinetik/examples/RocketRestCircuitBreakerExample.html"/>
+            <item name="NASA APOD" href="examples/index.html?path=com/guinetik/examples/NasaApodExample.html"/>
+            <item name="Pokemon API" href="examples/index.html?path=com/guinetik/examples/PokeApiExample.html"/>
+        </menu>
+
+        <menu name="Project Information" ref="reports"/>
+
+        <menu name="Links">
+            <item name="GitHub" href="https://github.com/guinetik/rocketrest"/>
+            <item name="Issues" href="https://github.com/guinetik/rocketrest/issues"/>
+        </menu>
+
+    </body>
+</project>

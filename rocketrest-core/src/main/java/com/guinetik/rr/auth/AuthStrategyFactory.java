@@ -4,7 +4,64 @@ import java.util.Map;
 import java.util.function.BooleanSupplier;
 
 /**
- * Factory for creating authentication strategies.
+ * Factory for creating {@link AuthStrategy} instances.
+ *
+ * <p>This factory provides static methods to create various authentication strategies
+ * without directly instantiating the strategy classes. It's the recommended way to
+ * create authentication strategies for use with {@link com.guinetik.rr.RocketRestConfig}.
+ *
+ * <h2>No Authentication</h2>
+ * <pre class="language-java"><code>
+ * AuthStrategy noAuth = AuthStrategyFactory.createNoAuth();
+ * </code></pre>
+ *
+ * <h2>Basic Authentication</h2>
+ * <pre class="language-java"><code>
+ * AuthStrategy basic = AuthStrategyFactory.createBasicAuth("username", "password");
+ * </code></pre>
+ *
+ * <h2>Bearer Token</h2>
+ * <pre class="language-java"><code>
+ * // Simple bearer token
+ * AuthStrategy bearer = AuthStrategyFactory.createBearerToken("my-api-token");
+ *
+ * // Bearer token with custom refresh logic
+ * AuthStrategy refreshable = AuthStrategyFactory.createBearerToken("initial-token", () -&gt; {
+ *     // Custom refresh logic
+ *     String newToken = fetchNewTokenFromServer();
+ *     return newToken != null;
+ * });
+ * </code></pre>
+ *
+ * <h2>OAuth 2.0 Client Credentials</h2>
+ * <pre class="language-java"><code>
+ * AuthStrategy oauth = AuthStrategyFactory.createOAuth2ClientCredentials(
+ *     "client-id",
+ *     "client-secret",
+ *     "https://auth.example.com/oauth/token"
+ * );
+ *
+ * // With additional parameters (e.g., scope)
+ * Map&lt;String, String&gt; params = new HashMap&lt;&gt;();
+ * params.put("scope", "read write");
+ * AuthStrategy oauthWithScope = AuthStrategyFactory.createOAuth2ClientCredentials(
+ *     "client-id", "client-secret", "https://auth.example.com/oauth/token", params
+ * );
+ * </code></pre>
+ *
+ * <h2>OAuth 2.0 Password Grant</h2>
+ * <pre class="language-java"><code>
+ * AuthStrategy password = AuthStrategyFactory.createOAuth2Password(
+ *     "user@example.com",
+ *     "userPassword",
+ *     "https://auth.example.com/oauth/token"
+ * );
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see AuthStrategy
+ * @see com.guinetik.rr.RocketRestConfig
+ * @since 1.0.0
  */
 public class AuthStrategyFactory {
     
