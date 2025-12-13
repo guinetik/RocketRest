@@ -5,7 +5,42 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Utility class for logging HTTP responses.
+ * Utility class for configurable HTTP response logging.
+ *
+ * <p>This class provides methods for logging HTTP response details based on
+ * {@link RocketRestOptions} configuration. It supports logging status codes,
+ * headers, and response bodies with configurable truncation for large responses.
+ *
+ * <h2>Logging Configuration</h2>
+ * <pre class="language-java"><code>
+ * RocketRestOptions options = new RocketRestOptions();
+ *
+ * // Enable/disable logging
+ * options.set(RocketRestOptions.LOGGING_ENABLED, true);
+ *
+ * // Enable raw response logging (status + headers)
+ * options.set(RocketRestOptions.LOG_RAW_RESPONSE, true);
+ *
+ * // Enable body logging
+ * options.set(RocketRestOptions.LOG_RESPONSE_BODY, true);
+ *
+ * // Set max body length before truncation
+ * options.set(RocketRestOptions.MAX_LOGGED_BODY_LENGTH, 4000);
+ * </code></pre>
+ *
+ * <h2>Usage in HTTP Clients</h2>
+ * <pre class="language-java"><code>
+ * // After receiving response
+ * Map&lt;String, String&gt; headers = parseHeaders(connection);
+ * ResponseLogger.logRawResponse(statusCode, headers, options);
+ *
+ * String body = readResponseBody(connection);
+ * ResponseLogger.logResponseBody(body, options);
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see RocketRestOptions
+ * @since 1.0.0
  */
 public final class ResponseLogger {
 

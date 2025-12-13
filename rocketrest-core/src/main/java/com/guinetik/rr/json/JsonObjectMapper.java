@@ -17,6 +17,68 @@ import java.net.HttpURLConnection;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Pre-configured Jackson {@link ObjectMapper} with utility methods for JSON operations.
+ *
+ * <p>This class extends Jackson's ObjectMapper with RocketRest-specific configuration and
+ * provides convenient static methods for common JSON serialization and deserialization tasks.
+ *
+ * <h2>Default Configuration</h2>
+ * <ul>
+ *   <li>Field visibility: ANY (serializes private fields)</li>
+ *   <li>Getter/Setter visibility: NONE (ignores getters/setters)</li>
+ *   <li>Indented output: enabled</li>
+ *   <li>Unknown properties: ignored</li>
+ *   <li>Null values: excluded from output</li>
+ * </ul>
+ *
+ * <h2>Object Serialization</h2>
+ * <pre class="language-java"><code>
+ * User user = new User("John", "john@example.com");
+ *
+ * // To JSON string (indented)
+ * String json = JsonObjectMapper.toJsonString(user);
+ *
+ * // To JSON string (compact)
+ * String compact = JsonObjectMapper.toJsonStringNoIdent(user);
+ * </code></pre>
+ *
+ * <h2>Object Deserialization</h2>
+ * <pre class="language-java"><code>
+ * String json = "{\"name\":\"John\",\"email\":\"john@example.com\"}";
+ *
+ * // To typed object
+ * User user = JsonObjectMapper.jsonToObject(json, User.class);
+ *
+ * // To Map
+ * Map&lt;String, Object&gt; map = JsonObjectMapper.jsonToMap(json);
+ *
+ * // To List of Maps
+ * String arrayJson = "[{\"id\":1},{\"id\":2}]";
+ * List&lt;Map&lt;String, Object&gt;&gt; list = JsonObjectMapper.jsonToListOfMap(arrayJson);
+ * </code></pre>
+ *
+ * <h2>JsonNode Operations</h2>
+ * <pre class="language-java"><code>
+ * JsonNode node = JsonObjectMapper.getJsonNode(json);
+ * String name = node.get("name").asText();
+ *
+ * Map&lt;String, Object&gt; map = JsonObjectMapper.jsonNodeToMap(node);
+ * </code></pre>
+ *
+ * <h2>Singleton Access</h2>
+ * <pre class="language-java"><code>
+ * // Get pre-configured singleton instance
+ * ObjectMapper mapper = JsonObjectMapper.get();
+ *
+ * // Get fresh default-configured mapper
+ * ObjectMapper fresh = JsonObjectMapper.getDefault();
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see ObjectMapper
+ * @since 1.0.0
+ */
 public class JsonObjectMapper extends ObjectMapper {
 
     private static final long serialVersionUID = 1L;

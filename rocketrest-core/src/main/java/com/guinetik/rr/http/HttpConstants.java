@@ -1,8 +1,51 @@
 package com.guinetik.rr.http;
 
 /**
- * Contains constants used throughout the HTTP client implementation.
- * Centralizes HTTP-related constants to avoid duplication and improve maintainability.
+ * Centralized constants for HTTP operations used throughout RocketRest.
+ *
+ * <p>This utility class contains all HTTP-related constants including methods, status codes,
+ * timeouts, headers, and circuit breaker configuration. Using these constants ensures
+ * consistency and maintainability across the codebase.
+ *
+ * <h2>HTTP Methods</h2>
+ * <pre class="language-java"><code>
+ * // Use HTTP method constants
+ * String method = HttpConstants.Methods.GET;
+ * String postMethod = HttpConstants.Methods.POST;
+ *
+ * // In request building
+ * RequestSpec request = new RequestBuilder()
+ *     .method(HttpConstants.Methods.POST)
+ *     .endpoint("/users")
+ *     .build();
+ * </code></pre>
+ *
+ * <h2>Status Code Handling</h2>
+ * <pre class="language-java"><code>
+ * // Check response status
+ * if (statusCode == HttpConstants.StatusCodes.OK) {
+ *     // Handle success
+ * } else if (statusCode == HttpConstants.StatusCodes.UNAUTHORIZED) {
+ *     // Handle auth failure
+ * }
+ *
+ * // Check ranges
+ * if (statusCode &gt;= HttpConstants.StatusCodes.SUCCESS_MIN &amp;&amp;
+ *     statusCode &lt;= HttpConstants.StatusCodes.SUCCESS_MAX) {
+ *     // 2xx response
+ * }
+ * </code></pre>
+ *
+ * <h2>Circuit Breaker Configuration</h2>
+ * <pre class="language-java"><code>
+ * RocketRestOptions options = new RocketRestOptions();
+ * options.set(HttpConstants.CircuitBreaker.CIRCUIT_BREAKER_ENABLED, true);
+ * options.set(HttpConstants.CircuitBreaker.CIRCUIT_BREAKER_FAILURE_THRESHOLD, 5);
+ * options.set(HttpConstants.CircuitBreaker.CIRCUIT_BREAKER_RESET_TIMEOUT_MS, 30000);
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @since 1.0.0
  */
 public final class HttpConstants {
 

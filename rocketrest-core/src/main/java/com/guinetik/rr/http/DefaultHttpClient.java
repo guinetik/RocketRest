@@ -23,8 +23,56 @@ import java.util.Optional;
 import java.util.StringJoiner;
 
 /**
- * Default implementation of HttpRequestClient using HttpURLConnection.
- * This class handles HTTP requests without external dependencies.
+ * Default implementation of {@link RocketClient} using Java's built-in {@link java.net.HttpURLConnection}.
+ *
+ * <p>This client provides HTTP request execution without external dependencies, making it
+ * suitable for environments where third-party HTTP libraries cannot be used. It supports
+ * all standard HTTP methods, custom headers, SSL/TLS configuration, and JSON serialization.
+ *
+ * <h2>Features</h2>
+ * <ul>
+ *   <li>Zero external HTTP dependencies (uses java.net.HttpURLConnection)</li>
+ *   <li>Automatic JSON serialization/deserialization via Jackson</li>
+ *   <li>SSL/TLS support with custom certificate configuration</li>
+ *   <li>Configurable timeouts and request options</li>
+ *   <li>Query parameter encoding and URL building</li>
+ *   <li>Comprehensive error handling with status codes</li>
+ * </ul>
+ *
+ * <h2>Direct Usage</h2>
+ * <pre class="language-java"><code>
+ * // Create a client
+ * DefaultHttpClient client = new DefaultHttpClient("https://api.example.com");
+ *
+ * // Build and execute a request
+ * RequestSpec&lt;Void, User&gt; request = RequestBuilder.&lt;Void, User&gt;get("/users/1")
+ *     .responseType(User.class)
+ *     .build();
+ *
+ * User user = client.execute(request);
+ * </code></pre>
+ *
+ * <h2>With Custom Options</h2>
+ * <pre class="language-java"><code>
+ * RocketRestOptions options = new RocketRestOptions();
+ * options.set(RocketRestOptions.LOGGING_ENABLED, true);
+ * options.set(RocketRestOptions.LOG_RESPONSE_BODY, true);
+ *
+ * DefaultHttpClient client = new DefaultHttpClient(
+ *     "https://api.example.com",
+ *     options
+ * );
+ * </code></pre>
+ *
+ * <h2>Note</h2>
+ * <p>For most use cases, prefer using {@link com.guinetik.rr.RocketRest} facade or
+ * {@link RocketClientFactory} instead of instantiating this class directly.
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see RocketClient
+ * @see RocketClientFactory
+ * @see com.guinetik.rr.RocketRest
+ * @since 1.0.0
  */
 public class DefaultHttpClient implements RocketClient {
 

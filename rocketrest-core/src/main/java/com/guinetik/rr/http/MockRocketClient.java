@@ -14,9 +14,61 @@ import java.util.function.BiFunction;
 import java.util.regex.Pattern;
 
 /**
- * Mock implementation of RocketClient for testing purposes.
- * Provides a way to simulate HTTP client behavior without making actual network requests.
- * Can be used with RocketClientFactory to provide mocked clients throughout the application.
+ * Mock implementation of {@link RocketClient} for unit testing without network requests.
+ *
+ * <p>This client simulates HTTP responses based on predefined rules, enabling unit testing
+ * of code that depends on RocketRest without requiring actual network connectivity.
+ * It supports URL pattern matching, response simulation, and invocation tracking.
+ *
+ * <h2>Features</h2>
+ * <ul>
+ *   <li>Predefined mock responses for method/URL combinations</li>
+ *   <li>Regex-based URL pattern matching</li>
+ *   <li>Simulated network latency</li>
+ *   <li>Custom HTTP status codes</li>
+ *   <li>Invocation counting for verification</li>
+ * </ul>
+ *
+ * <h2>Basic Usage</h2>
+ * <pre class="language-java"><code>
+ * MockRocketClient mockClient = new MockRocketClient();
+ *
+ * // Add mock response
+ * mockClient.addMockResponse("GET", "/users/.*", (url, body) -&gt; {
+ *     User user = new User();
+ *     user.setId(1);
+ *     user.setName("Test User");
+ *     return user;
+ * });
+ *
+ * // Execute request - returns mock response
+ * RequestSpec&lt;Void, User&gt; request = RequestBuilder.&lt;Void, User&gt;get("/users/1")
+ *     .responseType(User.class)
+ *     .build();
+ *
+ * User user = mockClient.execute(request);
+ * </code></pre>
+ *
+ * <h2>Simulating Latency and Status Codes</h2>
+ * <pre class="language-java"><code>
+ * mockClient.withLatency("/slow/.*", 1000L);  // 1 second delay
+ * mockClient.withStatusCode("/error/.*", 500); // Server error
+ * </code></pre>
+ *
+ * <h2>Verifying Calls</h2>
+ * <pre class="language-java"><code>
+ * // Check invocation count
+ * int count = mockClient.getInvocationCount("GET", "/users/.*");
+ * assertEquals(1, count);
+ *
+ * // Reset for next test
+ * mockClient.resetCounts();
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see RocketClient
+ * @see com.guinetik.rr.RocketRestMock
+ * @since 1.0.0
  */
 public class MockRocketClient implements RocketClient {
     private static final Logger logger = LoggerFactory.getLogger(MockRocketClient.class);

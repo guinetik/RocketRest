@@ -15,12 +15,55 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
 /**
- * A RocketClient implementation that adds circuit breaker functionality
- * to any underlying RocketClient implementation.
- * <p>
- * The circuit breaker pattern prevents cascading failures by failing fast when
- * a service appears to be unhealthy, allowing it time to recover without being
- * overwhelmed by requests.
+ * Decorator that adds circuit breaker resilience pattern to any {@link RocketClient}.
+ *
+ * <p>The circuit breaker pattern prevents cascading failures by failing fast when a downstream
+ * service appears unhealthy. This gives the service time to recover without being overwhelmed
+ * by requests that are likely to fail.
+ *
+ * <h2>Circuit Breaker States</h2>
+ * <ul>
+ *   <li><b>CLOSED</b> - Normal operation, requests pass through</li>
+ *   <li><b>OPEN</b> - Circuit is open, requests fail fast with {@link CircuitBreakerOpenException}</li>
+ *   <li><b>HALF_OPEN</b> - Testing if service recovered, next request determines state</li>
+ * </ul>
+ *
+ * <h2>Basic Usage</h2>
+ * <pre class="language-java"><code>
+ * // Wrap any RocketClient with circuit breaker
+ * RocketClient baseClient = new DefaultHttpClient("https://api.example.com");
+ * CircuitBreakerClient client = new CircuitBreakerClient(baseClient);
+ *
+ * try {
+ *     User user = client.execute(request);
+ * } catch (CircuitBreakerOpenException e) {
+ *     System.out.println("Service unavailable, retry after: " +
+ *         e.getEstimatedMillisUntilReset() + "ms");
+ * }
+ * </code></pre>
+ *
+ * <h2>Custom Configuration</h2>
+ * <pre class="language-java"><code>
+ * // Circuit opens after 3 failures, resets after 60 seconds
+ * CircuitBreakerClient client = new CircuitBreakerClient(
+ *     baseClient,
+ *     3,      // failure threshold
+ *     60000   // reset timeout in ms
+ * );
+ * </code></pre>
+ *
+ * <h2>Via RocketClientFactory</h2>
+ * <pre class="language-java"><code>
+ * RocketClient client = RocketClientFactory.builder("https://api.example.com")
+ *     .withCircuitBreaker(5, 30000)
+ *     .build();
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see RocketClient
+ * @see CircuitBreakerOpenException
+ * @see RocketClientFactory
+ * @since 1.0.0
  */
 public class CircuitBreakerClient implements RocketClient {
     private static final Logger logger = LoggerFactory.getLogger(CircuitBreakerClient.class);
