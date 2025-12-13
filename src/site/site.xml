@@ -36,6 +36,7 @@
     <body>
         <head>
             <![CDATA[
+                <link rel="icon" type="image/svg+xml" href="./images/logo.svg" />
                 <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" rel="stylesheet" />
                 <link href="./css/prism-terminal.css" rel="stylesheet" />
                 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" defer></script>
