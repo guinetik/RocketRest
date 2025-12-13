@@ -10,9 +10,58 @@ import org.slf4j.LoggerFactory;
 import javax.net.ssl.SSLContext;
 
 /**
- * A fluent HTTP client implementation that uses the Result pattern instead of exceptions.
- * This client offers a more declarative way to handle errors without exceptions by delegating
- * to an underlying RocketClient implementation.
+ * HTTP client using the Result pattern for exception-free error handling.
+ *
+ * <p>This client wraps any {@link RocketClient} and converts exception-based errors into
+ * {@link com.guinetik.rr.result.Result} objects, enabling functional-style error handling.
+ *
+ * <h2>Benefits</h2>
+ * <ul>
+ *   <li>No exceptions to catch - errors are values</li>
+ *   <li>Compile-time enforcement of error handling</li>
+ *   <li>Functional composition with map, flatMap, fold</li>
+ * </ul>
+ *
+ * <h2>Basic Usage</h2>
+ * <pre class="language-java"><code>
+ * FluentHttpClient client = new FluentHttpClient("https://api.example.com");
+ *
+ * Result&lt;User, ApiError&gt; result = client.executeWithResult(request);
+ *
+ * // Pattern matching style
+ * result.match(
+ *     user -&gt; System.out.println("Success: " + user.getName()),
+ *     error -&gt; System.err.println("Error: " + error.getMessage())
+ * );
+ *
+ * // Or check and extract
+ * if (result.isSuccess()) {
+ *     User user = result.getValue();
+ * }
+ * </code></pre>
+ *
+ * <h2>Functional Composition</h2>
+ * <pre class="language-java"><code>
+ * // Transform success value
+ * Result&lt;String, ApiError&gt; name = result.map(User::getName);
+ *
+ * // Provide default on error
+ * User userOrDefault = result.getOrElse(defaultUser);
+ * </code></pre>
+ *
+ * <h2>Via RocketRest</h2>
+ * <pre class="language-java"><code>
+ * RocketRest client = new RocketRest(config);
+ *
+ * Result&lt;User, ApiError&gt; result = client.fluent()
+ *     .get("/users/1", User.class);
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see RocketClient
+ * @see com.guinetik.rr.result.Result
+ * @see com.guinetik.rr.RocketRest#fluent()
+ * @since 1.0.0
  */
 public class FluentHttpClient implements RocketClient {
 

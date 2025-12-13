@@ -4,8 +4,57 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Represents HTTP headers for requests in a structured way.
- * Provides convenience methods for common headers.
+ * Fluent builder for HTTP request headers with convenience methods for common headers.
+ *
+ * <p>This class provides a type-safe way to build and manage HTTP headers for requests,
+ * with predefined constants for common header names and content types.
+ *
+ * <h2>Building Headers</h2>
+ * <pre class="language-java"><code>
+ * // Create headers with fluent API
+ * RocketHeaders headers = new RocketHeaders()
+ *     .contentType(RocketHeaders.ContentTypes.APPLICATION_JSON)
+ *     .accept(RocketHeaders.ContentTypes.APPLICATION_JSON)
+ *     .set("X-Custom-Header", "custom-value");
+ *
+ * // Use in request
+ * RequestSpec request = RequestBuilder.post("/users")
+ *     .headers(headers)
+ *     .body(user)
+ *     .responseType(User.class)
+ *     .build();
+ * </code></pre>
+ *
+ * <h2>Authentication Headers</h2>
+ * <pre class="language-java"><code>
+ * // Bearer token authentication
+ * RocketHeaders headers = new RocketHeaders()
+ *     .bearerAuth("my-jwt-token");
+ *
+ * // Basic authentication
+ * RocketHeaders basicAuth = new RocketHeaders()
+ *     .basicAuth("username", "password");
+ * </code></pre>
+ *
+ * <h2>Default JSON Headers</h2>
+ * <pre class="language-java"><code>
+ * // Get pre-configured JSON headers
+ * RocketHeaders jsonHeaders = RocketHeaders.defaultJson();
+ * // Equivalent to Content-Type: application/json + Accept: application/json
+ * </code></pre>
+ *
+ * <h2>Merging Headers</h2>
+ * <pre class="language-java"><code>
+ * RocketHeaders base = RocketHeaders.defaultJson();
+ * RocketHeaders auth = new RocketHeaders().bearerAuth("token");
+ *
+ * // Merge headers (auth values take precedence)
+ * RocketHeaders merged = base.merge(auth);
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see com.guinetik.rr.request.RequestBuilder
+ * @since 1.0.0
  */
 public class RocketHeaders {
     

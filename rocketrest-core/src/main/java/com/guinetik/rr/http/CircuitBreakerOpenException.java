@@ -1,9 +1,47 @@
 package com.guinetik.rr.http;
 
 /**
- * Exception thrown when a request is rejected because the circuit breaker is open.
- * This exception indicates that the service is considered unhealthy and requests are 
- * being fast-failed to prevent cascading failures.
+ * Exception thrown when a request is rejected due to an open circuit breaker.
+ *
+ * <p>This exception indicates that the downstream service is considered unhealthy and
+ * requests are being fast-failed to prevent cascading failures. It provides timing
+ * information to help callers decide when to retry.
+ *
+ * <h2>Handling Circuit Open</h2>
+ * <pre class="language-java"><code>
+ * try {
+ *     User user = client.get("/users/1", User.class);
+ * } catch (CircuitBreakerOpenException e) {
+ *     long waitTime = e.getEstimatedMillisUntilReset();
+ *
+ *     if (waitTime &gt; 0) {
+ *         System.out.println("Service unavailable, retry in " + waitTime + "ms");
+ *         // Schedule retry after waitTime
+ *     } else {
+ *         // Circuit should be half-open soon, retry immediately
+ *         System.out.println("Circuit may reset soon, retrying...");
+ *     }
+ * }
+ * </code></pre>
+ *
+ * <h2>Using with Fluent API</h2>
+ * <pre class="language-java"><code>
+ * Result&lt;User, ApiError&gt; result = client.fluent().get("/users/1", User.class);
+ *
+ * result.match(
+ *     user -&gt; System.out.println("Success"),
+ *     error -&gt; {
+ *         if (error.isCircuitOpen()) {
+ *             System.out.println("Circuit breaker is open");
+ *         }
+ *     }
+ * );
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see CircuitBreakerClient
+ * @see RocketRestException
+ * @since 1.0.0
  */
 public class CircuitBreakerOpenException extends RocketRestException {
     

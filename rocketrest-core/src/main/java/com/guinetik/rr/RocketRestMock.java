@@ -18,10 +18,79 @@ import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 
 /**
- * Mock implementation of RocketRest for testing purposes.
- * Provides a way to simulate interactions with REST APIs without making actual HTTP requests.
- * Define predefined responses for specific HTTP methods and URL patterns.
- * Supports regex matching for URL patterns and simulated network latency.
+ * Mock implementation of {@link RocketRest} for unit testing without actual HTTP requests.
+ *
+ * <p>This class simulates REST API interactions by returning predefined responses based on
+ * HTTP method and URL patterns. It supports regex matching, simulated network latency,
+ * invocation counting, and circuit breaker testing.
+ *
+ * <h2>Features</h2>
+ * <ul>
+ *   <li>Predefined mock responses for any HTTP method and URL pattern</li>
+ *   <li>Regex-based URL matching for flexible endpoint simulation</li>
+ *   <li>Simulated network latency for timing-sensitive tests</li>
+ *   <li>Invocation counting for verification in tests</li>
+ *   <li>Circuit breaker integration for resilience testing</li>
+ * </ul>
+ *
+ * <h2>Basic Usage</h2>
+ * <pre class="language-java"><code>
+ * // Create mock client
+ * RocketRestConfig config = RocketRestConfig.builder("https://api.example.com").build();
+ * RocketRestMock mockClient = new RocketRestMock(config);
+ *
+ * // Define mock responses
+ * mockClient.addMockResponse("GET", "/users/1", (url, body) -&gt; {
+ *     User user = new User();
+ *     user.setId(1);
+ *     user.setName("John Doe");
+ *     return user;
+ * });
+ *
+ * // Use in tests
+ * User user = mockClient.get("/users/1", User.class);
+ * assertEquals("John Doe", user.getName());
+ * </code></pre>
+ *
+ * <h2>Regex URL Matching</h2>
+ * <pre class="language-java"><code>
+ * // Match any user ID
+ * mockClient.addMockResponse("GET", "/users/\\d+", (url, body) -&gt; {
+ *     // Extract ID from URL and return corresponding user
+ *     String id = url.replaceAll(".*/users/(\\d+).*", "$1");
+ *     User user = new User();
+ *     user.setId(Integer.parseInt(id));
+ *     return user;
+ * }, true);  // true enables regex matching
+ * </code></pre>
+ *
+ * <h2>Simulating Latency</h2>
+ * <pre class="language-java"><code>
+ * // Add 500ms latency for slow endpoint testing
+ * mockClient.withLatency("/slow-endpoint.*", 500L);
+ *
+ * // Test timeout behavior
+ * Result&lt;Response, ApiError&gt; result = mockClient.fluent()
+ *     .get("/slow-endpoint", Response.class);
+ * </code></pre>
+ *
+ * <h2>Verifying Invocations</h2>
+ * <pre class="language-java"><code>
+ * // Make some calls
+ * mockClient.get("/users/1", User.class);
+ * mockClient.get("/users/1", User.class);
+ *
+ * // Verify call count
+ * assertEquals(2, mockClient.getInvocationCount("GET", "/users/1"));
+ *
+ * // Reset for next test
+ * mockClient.resetInvocationCounts();
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see RocketRest
+ * @see com.guinetik.rr.http.MockRocketClient
+ * @since 1.0.0
  */
 public class RocketRestMock extends RocketRest {
     private final Logger logger = LoggerFactory.getLogger(this.getClass());

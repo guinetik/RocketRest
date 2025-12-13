@@ -5,7 +5,41 @@ import java.io.InputStream;
 import java.util.Scanner;
 
 /**
- * Utility class for stream operations to ensure proper resource management.
+ * Utility class for safe input stream operations with proper resource management.
+ *
+ * <p>This class provides static methods for reading input streams into strings,
+ * ensuring proper cleanup of resources even when exceptions occur.
+ *
+ * <h2>Reading Input Streams</h2>
+ * <pre class="language-java"><code>
+ * // Read an input stream to string
+ * InputStream is = connection.getInputStream();
+ * String content = StreamUtils.readInputStreamAsString(is);
+ *
+ * // Read error stream (returns null if unavailable)
+ * InputStream errorStream = connection.getErrorStream();
+ * String error = StreamUtils.readErrorStream(errorStream);
+ * if (error != null) {
+ *     System.err.println("Error response: " + error);
+ * }
+ * </code></pre>
+ *
+ * <h2>Usage in HTTP Response Handling</h2>
+ * <pre class="language-java"><code>
+ * HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+ * int status = conn.getResponseCode();
+ *
+ * if (status &gt;= 200 &amp;&amp; status &lt; 300) {
+ *     String body = StreamUtils.readInputStreamAsString(conn.getInputStream());
+ *     // Process successful response
+ * } else {
+ *     String error = StreamUtils.readErrorStream(conn.getErrorStream());
+ *     // Handle error response
+ * }
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @since 1.0.0
  */
 public final class StreamUtils {
     

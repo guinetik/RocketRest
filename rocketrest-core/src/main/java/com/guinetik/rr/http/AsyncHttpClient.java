@@ -9,8 +9,54 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 
 /**
- * Asynchronous HTTP client that wraps a synchronous HttpRequestClient
- * implementation and executes requests on a separate thread pool.
+ * Asynchronous HTTP client that executes requests on a dedicated thread pool.
+ *
+ * <p>This client wraps any synchronous {@link RocketClient} implementation and provides
+ * non-blocking request execution via {@link java.util.concurrent.CompletableFuture}.
+ *
+ * <h2>Features</h2>
+ * <ul>
+ *   <li>Non-blocking request execution with CompletableFuture</li>
+ *   <li>Configurable thread pool size</li>
+ *   <li>Wraps any RocketClient implementation</li>
+ *   <li>Proper exception propagation via CompletionException</li>
+ * </ul>
+ *
+ * <h2>Basic Usage</h2>
+ * <pre class="language-java"><code>
+ * ExecutorService executor = Executors.newFixedThreadPool(4);
+ * AsyncHttpClient asyncClient = new AsyncHttpClient(
+ *     "https://api.example.com",
+ *     executor
+ * );
+ *
+ * // Execute async request
+ * CompletableFuture&lt;User&gt; future = asyncClient.executeAsync(request);
+ *
+ * // Handle result when ready
+ * future.thenAccept(user -&gt; System.out.println("Got: " + user.getName()))
+ *       .exceptionally(ex -&gt; {
+ *           System.err.println("Failed: " + ex.getMessage());
+ *           return null;
+ *       });
+ *
+ * // Don't forget to shutdown
+ * asyncClient.shutdown();
+ * </code></pre>
+ *
+ * <h2>Via RocketRest</h2>
+ * <pre class="language-java"><code>
+ * RocketRest client = new RocketRest(config);
+ *
+ * client.async().get("/users/1", User.class)
+ *     .thenAccept(user -&gt; System.out.println(user));
+ * </code></pre>
+ *
+ * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see RocketClient
+ * @see RocketClientFactory
+ * @see com.guinetik.rr.RocketRest#async()
+ * @since 1.0.0
  */
 public class AsyncHttpClient implements RocketClient {
 
