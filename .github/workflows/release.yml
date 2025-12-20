@@ -1,111 +1,41 @@
-name: Release
+name: Release to Maven Central
 
 on:
-  push:
-    branches:
-      - master
+  release:
+    types: [created]
 
 jobs:
-  build-and-check:
-    name: Build and Check Version
+  publish:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.get_version.outputs.VERSION }}
-      tag_exists: ${{ steps.check_tag.outputs.TAG_EXISTS }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Set up JDK 8
-        uses: actions/setup-java@v3
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check version is not SNAPSHOT
+        run: |
+          VERSION=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec)
+          if [[ $VERSION == *"-SNAPSHOT"* ]]; then
+            echo "ERROR: Cannot release SNAPSHOT version: $VERSION"
+            exit 1
+          fi
+          echo "Releasing version: $VERSION"
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
         with:
-          java-version: '8'
+          java-version: '11'
           distribution: 'temurin'
           cache: maven
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: GPG_PASSPHRASE
 
-      - name: Extract version from pom.xml
-        id: get_version
-        run: |
-          cd rocketrest-core
-          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "Detected version: $VERSION"
-
-      - name: Check if tag exists
-        id: check_tag
-        run: |
-          TAG_EXISTS=$(git tag -l "v${{ steps.get_version.outputs.VERSION }}")
-          if [ -z "$TAG_EXISTS" ]; then
-            echo "TAG_EXISTS=false" >> $GITHUB_OUTPUT
-            echo "Tag does not exist, will proceed with build and release"
-          else
-            echo "TAG_EXISTS=true" >> $GITHUB_OUTPUT
-            echo "Tag already exists, will skip release"
-          fi
-      
-      - name: Build with Maven
-        id: build
-        if: steps.check_tag.outputs.TAG_EXISTS == 'false'
-        run: |
-          cd rocketrest-core
-          mvn -B clean package javadoc:jar
-      
-      - name: Upload artifacts
-        if: steps.check_tag.outputs.TAG_EXISTS == 'false'
-        uses: actions/upload-artifact@v4
-        with:
-          name: jar-artifacts
-          path: |
-            rocketrest-core/target/*.jar
-          retention-days: 1
-
-  tag-and-release:
-    name: Tag and Release
-    needs: build-and-check
-    if: needs.build-and-check.outputs.tag_exists == 'false'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.PAT_GITHUB }}
-
-      - name: Create and push tag
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          echo "Creating tag v${{ needs.build-and-check.outputs.version }}"
-          git tag -a "v${{ needs.build-and-check.outputs.version }}" -m "Release v${{ needs.build-and-check.outputs.version }}"
-          git push origin "v${{ needs.build-and-check.outputs.version }}"
+      - name: Publish to Maven Central
+        run: mvn -B clean deploy -Prelease
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: jar-artifacts
-          path: artifacts
-          
-      - name: Check artifact structure
-        run: |
-          find artifacts -type f | sort
-          echo "------"
-          ls -la artifacts/
-
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ needs.build-and-check.outputs.version }}
-          name: RocketRest v${{ needs.build-and-check.outputs.version }}
-          draft: false
-          prerelease: false
-          files: |
-            artifacts/*.jar
-        env:
-          GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
