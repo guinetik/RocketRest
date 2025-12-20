@@ -26,3 +26,9 @@ target/
 .idea
 .cursor
 .cursorignore
+
+##eclipse
+.project
+.settings
+.classpath
+*.versionsBackup
