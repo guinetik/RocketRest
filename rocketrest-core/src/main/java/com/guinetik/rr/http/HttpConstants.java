@@ -223,6 +223,8 @@ public final class HttpConstants {
         public static final String LOG_CIRCUIT_OPENED = "Circuit breaker opened after {} failures";
         /** Log message when failure count is reset due to decay timeout */
         public static final String LOG_DECAY_RESET = "Reset failure count due to decay timeout";
+        /** Log message when a request is rejected during HALF_OPEN because another test is in progress */
+        public static final String LOG_HALF_OPEN_TEST_IN_PROGRESS = "Rejecting request - another test request is in progress";
 
         // Health status
         /** Circuit breaker status: open (not allowing requests) */

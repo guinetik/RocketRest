@@ -8,7 +8,9 @@ import javax.net.ssl.SSLContext;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -103,6 +105,7 @@ public class CircuitBreakerClient implements RocketClient {
     private final AtomicInteger failureCount = new AtomicInteger(0);
     private final AtomicLong lastFailureTime = new AtomicLong(0);
     private final AtomicLong lastResetTime = new AtomicLong(System.currentTimeMillis());
+    private final AtomicBoolean halfOpenTestInProgress = new AtomicBoolean(false);
     private final int failureThreshold;
     private final long resetTimeoutMs;
     private final long failureDecayTimeMs;
@@ -143,28 +146,41 @@ public class CircuitBreakerClient implements RocketClient {
 
     /**
      * Creates a fully customized circuit breaker
-     * 
-     * @param delegate The underlying client implementation
+     *
+     * @param delegate The underlying client implementation (must not be null)
      * @param failureThreshold Number of failures before opening circuit
      * @param resetTimeoutMs Time in milliseconds before trying to close circuit
      * @param failureDecayTimeMs Time after which failure count starts to decay
      * @param failurePolicy Strategy to determine what counts as a failure
      * @param failurePredicate Custom predicate if policy is CUSTOM
+     * @throws NullPointerException if delegate is null
+     * @throws IllegalArgumentException if failureThreshold is less than 1 or timeouts are negative
      */
     public CircuitBreakerClient(RocketClient delegate, int failureThreshold, long resetTimeoutMs,
                                long failureDecayTimeMs, FailurePolicy failurePolicy,
                                Predicate<RocketRestException> failurePredicate) {
-        this.delegate = delegate;
+        this.delegate = Objects.requireNonNull(delegate, "delegate must not be null");
+
+        if (failureThreshold < 1) {
+            throw new IllegalArgumentException("failureThreshold must be at least 1");
+        }
+        if (resetTimeoutMs < 0) {
+            throw new IllegalArgumentException("resetTimeoutMs must not be negative");
+        }
+        if (failureDecayTimeMs < 0) {
+            throw new IllegalArgumentException("failureDecayTimeMs must not be negative");
+        }
+
         this.failureThreshold = failureThreshold;
         this.resetTimeoutMs = resetTimeoutMs;
         this.failureDecayTimeMs = failureDecayTimeMs;
-        this.failurePolicy = failurePolicy;
-        
+        this.failurePolicy = failurePolicy != null ? failurePolicy : FailurePolicy.ALL_EXCEPTIONS;
+
         // Set default predicate based on policy if not provided
         if (failurePolicy == FailurePolicy.CUSTOM && failurePredicate != null) {
             this.failurePredicate = failurePredicate;
         } else {
-            this.failurePredicate = createDefaultPredicate(failurePolicy);
+            this.failurePredicate = createDefaultPredicate(this.failurePolicy);
         }
     }
 
@@ -172,28 +188,31 @@ public class CircuitBreakerClient implements RocketClient {
     public <Req, Res> Res execute(RequestSpec<Req, Res> requestSpec) throws RocketRestException {
         // Check for periodic decay reset
         checkFailureDecay();
-        
+
         // Track metrics
         totalRequests.incrementAndGet();
-        
-        // Check circuit state
+
+        // Check circuit state and handle state transitions
         State currentState = state.get();
+        boolean isTestRequest = false;
+
         if (currentState == State.OPEN) {
             if (System.currentTimeMillis() - lastFailureTime.get() >= resetTimeoutMs) {
                 // Try moving to HALF_OPEN
                 if (state.compareAndSet(State.OPEN, State.HALF_OPEN)) {
                     logger.info(HttpConstants.CircuitBreaker.LOG_CIRCUIT_HALF_OPEN);
                     currentState = State.HALF_OPEN;
+                } else {
+                    // Another thread transitioned the state, re-read it
+                    currentState = state.get();
                 }
             } else {
-                // Track metrics
+                // Track rejected request metric
                 rejectedRequests.incrementAndGet();
-                
+
                 // Get time since last failure
-                long now = System.currentTimeMillis();
-                long millisSinceFailure = now - lastFailureTime.get();
-                long remainingMillis = resetTimeoutMs - millisSinceFailure;
-                
+                long millisSinceFailure = System.currentTimeMillis() - lastFailureTime.get();
+
                 // We're in OPEN state and the timeout hasn't elapsed, so fast-fail with circuit breaker exception
                 throw new CircuitBreakerOpenException(
                     HttpConstants.CircuitBreaker.CIRCUIT_OPEN,
@@ -203,41 +222,61 @@ public class CircuitBreakerClient implements RocketClient {
             }
         }
 
+        // In HALF_OPEN state, only allow one test request at a time
+        if (currentState == State.HALF_OPEN) {
+            if (!halfOpenTestInProgress.compareAndSet(false, true)) {
+                // Another thread is already testing, reject this request
+                logger.debug(HttpConstants.CircuitBreaker.LOG_HALF_OPEN_TEST_IN_PROGRESS);
+                rejectedRequests.incrementAndGet();
+
+                long millisSinceFailure = System.currentTimeMillis() - lastFailureTime.get();
+                throw new CircuitBreakerOpenException(
+                    HttpConstants.CircuitBreaker.CIRCUIT_OPEN,
+                    millisSinceFailure,
+                    resetTimeoutMs
+                );
+            }
+            isTestRequest = true;
+        }
+
         try {
             // Execute the request with the delegate client
             Res response = delegate.execute(requestSpec);
 
-            // Success - reset circuit if needed
-            if (currentState != State.CLOSED) {
-                state.set(State.CLOSED);
-                failureCount.set(0);
-                logger.info(HttpConstants.CircuitBreaker.LOG_CIRCUIT_CLOSED);
+            // Success - reset circuit if needed (use compareAndSet to handle concurrent state changes)
+            State stateBeforeSuccess = state.get();
+            if (stateBeforeSuccess == State.HALF_OPEN) {
+                if (state.compareAndSet(State.HALF_OPEN, State.CLOSED)) {
+                    failureCount.set(0);
+                    logger.info(HttpConstants.CircuitBreaker.LOG_CIRCUIT_CLOSED);
+                }
             }
-            
+
             // Track metrics
             successfulRequests.incrementAndGet();
-            
+
             return response;
         } catch (RocketRestException e) {
             // Track all failures in metrics
             failedRequests.incrementAndGet();
-            
+
             // Track status code in metrics if available
             int statusCode = e.getStatusCode();
             if (statusCode > 0) {
                 statusCodeCounts.computeIfAbsent(statusCode, code -> new AtomicInteger(0))
                                 .incrementAndGet();
             }
-            
+
             // Handle failure according to policy
             boolean isCountableFailure = shouldCountAsFailure(e);
             if (isCountableFailure) {
                 handleFailure(e);
             }
-            
-            // If we just opened the circuit from this failure, wrap the exception
-            // to indicate the circuit is now open
-            if (isCountableFailure && currentState == State.CLOSED && state.get() == State.OPEN) {
+
+            // Check if we just opened the circuit from this failure
+            // Re-read state to get current value, not stale snapshot
+            State currentStateAfterFailure = state.get();
+            if (isCountableFailure && currentState == State.CLOSED && currentStateAfterFailure == State.OPEN) {
                 throw new CircuitBreakerOpenException(
                     "Circuit opened due to failure: " + e.getMessage(),
                     e,
@@ -245,16 +284,25 @@ public class CircuitBreakerClient implements RocketClient {
                     resetTimeoutMs
                 );
             }
-            
+
             // Otherwise rethrow the original exception
             throw e;
+        } finally {
+            // Always release the test lock if we acquired it
+            if (isTestRequest) {
+                halfOpenTestInProgress.set(false);
+            }
         }
     }
     
     /**
-     * Performs a health check by trying to execute the given request
-     * This can be used to manually test if the service is healthy
-     * 
+     * Performs a health check by trying to execute the given request.
+     * This can be used to manually test if the service is healthy.
+     * <p>
+     * Note: This method bypasses the normal circuit breaker flow and directly
+     * executes the request against the delegate. It's intended for external
+     * health monitoring systems.
+     *
      * @param <Req> Request type
      * @param <Res> Response type
      * @param healthCheckRequest The request to use as a health check
@@ -263,33 +311,38 @@ public class CircuitBreakerClient implements RocketClient {
     public <Req, Res> boolean performHealthCheck(RequestSpec<Req, Res> healthCheckRequest) {
         try {
             delegate.execute(healthCheckRequest);
-            
+
             // If we get here, service is healthy, close circuit
-            if (state.get() != State.CLOSED) {
+            State currentState = state.get();
+            if (currentState != State.CLOSED) {
                 state.set(State.CLOSED);
                 failureCount.set(0);
+                halfOpenTestInProgress.set(false);
                 logger.info(HttpConstants.CircuitBreaker.LOG_CIRCUIT_CLOSED);
             }
-            
+
             return true;
         } catch (RocketRestException e) {
             // Service still failing
             if (state.get() == State.HALF_OPEN) {
                 state.set(State.OPEN);
                 lastFailureTime.set(System.currentTimeMillis());
+                halfOpenTestInProgress.set(false);
                 logger.warn(HttpConstants.CircuitBreaker.LOG_TEST_FAILED);
             }
-            
+
             return false;
         }
     }
-    
+
     /**
-     * Manually resets the circuit to closed state
+     * Manually resets the circuit to closed state.
+     * This also resets all internal state including failure counts and test flags.
      */
     public void resetCircuit() {
         state.set(State.CLOSED);
         failureCount.set(0);
+        halfOpenTestInProgress.set(false);
         logger.info(HttpConstants.CircuitBreaker.LOG_CIRCUIT_CLOSED + " (manual reset)");
     }
     
@@ -328,6 +381,7 @@ public class CircuitBreakerClient implements RocketClient {
         metrics.put("failedRequests", failedRequests.get());
         metrics.put("rejectedRequests", rejectedRequests.get());
         metrics.put("circuitTrips", circuitTrips.get());
+        metrics.put("halfOpenTestInProgress", halfOpenTestInProgress.get());
         
         // Add status code counts
         Map<String, Integer> statusCounts = new HashMap<>();

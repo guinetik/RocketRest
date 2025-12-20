@@ -3,7 +3,12 @@ package com.guinetik.rr.http;
 import com.guinetik.rr.RocketRestConfig;
 import com.guinetik.rr.RocketRestOptions;
 import com.guinetik.rr.auth.RocketSSL;
+import com.guinetik.rr.interceptor.InterceptingClient;
+import com.guinetik.rr.interceptor.RequestInterceptor;
+import com.guinetik.rr.interceptor.RetryInterceptor;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
@@ -64,10 +69,26 @@ import java.util.function.UnaryOperator;
  *     .build();
  * </code></pre>
  *
+ * <h2>With Interceptors</h2>
+ * <pre class="language-java">{@code
+ * // Add retry with exponential backoff
+ * RocketClient client = RocketClientFactory.builder("https://api.example.com")
+ *     .withRetry(3, 1000)  // 3 retries, 1s initial delay
+ *     .build();
+ *
+ * // Multiple interceptors
+ * RocketClient client = RocketClientFactory.builder("https://api.example.com")
+ *     .withInterceptor(new LoggingInterceptor())
+ *     .withRetry(3, 1000, 2.0)  // With exponential backoff
+ *     .build();
+ * }</pre>
+ *
  * @author guinetik &lt;guinetik@gmail.com&gt;
  * @see RocketClient
  * @see CircuitBreakerClient
  * @see FluentHttpClient
+ * @see RequestInterceptor
+ * @see RetryInterceptor
  * @since 1.0.0
  */
 public class RocketClientFactory {
@@ -106,6 +127,8 @@ public class RocketClientFactory {
         private CircuitBreakerClient.FailurePolicy failurePolicy = CircuitBreakerClient.FailurePolicy.ALL_EXCEPTIONS;
         private Predicate<RocketRestException> failurePredicate = null;
         private UnaryOperator<RocketClient> customDecorator = null;
+        private List<RequestInterceptor> interceptors = new ArrayList<RequestInterceptor>();
+        private int interceptorMaxRetries = 3;
 
         private Builder(String baseUrl) {
             this.baseUrl = baseUrl;
@@ -200,6 +223,72 @@ public class RocketClientFactory {
         }
 
         /**
+         * Adds an interceptor to the client.
+         *
+         * <p>Interceptors are applied in order based on their {@link RequestInterceptor#getOrder()}.
+         * Lower order values run first for requests and last for responses.
+         *
+         * @param interceptor The interceptor to add
+         * @return this builder instance
+         * @see RequestInterceptor
+         */
+        public Builder withInterceptor(RequestInterceptor interceptor) {
+            if (interceptor != null) {
+                this.interceptors.add(interceptor);
+            }
+            return this;
+        }
+
+        /**
+         * Adds retry capability with default settings.
+         *
+         * <p>Uses 3 retries with 1 second initial delay, 2x exponential backoff,
+         * and 30 second maximum delay.
+         *
+         * @return this builder instance
+         */
+        public Builder withRetry() {
+            return withInterceptor(new RetryInterceptor());
+        }
+
+        /**
+         * Adds retry capability with custom retry count and delay.
+         *
+         * @param maxRetries Maximum number of retries
+         * @param initialDelayMs Initial delay between retries in milliseconds
+         * @return this builder instance
+         */
+        public Builder withRetry(int maxRetries, long initialDelayMs) {
+            return withInterceptor(new RetryInterceptor(maxRetries, initialDelayMs));
+        }
+
+        /**
+         * Adds retry capability with exponential backoff.
+         *
+         * @param maxRetries Maximum number of retries
+         * @param initialDelayMs Initial delay in milliseconds
+         * @param backoffMultiplier Multiplier for each retry (e.g., 2.0 doubles delay)
+         * @return this builder instance
+         */
+        public Builder withRetry(int maxRetries, long initialDelayMs, double backoffMultiplier) {
+            return withInterceptor(new RetryInterceptor(maxRetries, initialDelayMs, backoffMultiplier));
+        }
+
+        /**
+         * Sets the maximum number of retries allowed by the interceptor chain.
+         *
+         * <p>This is a global limit that applies across all retry interceptors.
+         * Default is 3.
+         *
+         * @param maxRetries Maximum retries for the interceptor chain
+         * @return this builder instance
+         */
+        public Builder withMaxRetries(int maxRetries) {
+            this.interceptorMaxRetries = maxRetries;
+            return this;
+        }
+
+        /**
          * Builds a synchronous RocketClient with the configured settings.
          *
          * @return A new RocketClient instance
@@ -252,6 +341,11 @@ public class RocketClientFactory {
                         this.failurePredicate
                 );
             }
+            // Apply interceptors if any are configured
+            if (!interceptors.isEmpty()) {
+                client = new InterceptingClient(client, interceptors, interceptorMaxRetries);
+            }
+
             // Apply any custom decorator
             if (customDecorator != null) {
                 client = customDecorator.apply(client);

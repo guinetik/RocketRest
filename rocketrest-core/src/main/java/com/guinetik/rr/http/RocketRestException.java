@@ -1,45 +1,52 @@
 package com.guinetik.rr.http;
 
 /**
- * Runtime exception thrown when HTTP request execution fails in RocketRest.
+ * Base runtime exception for all HTTP-related errors in RocketRest.
  *
  * <p>This exception captures HTTP error details including the status code and response body,
  * making it easier to handle and diagnose API errors. As a RuntimeException, it doesn't
  * require explicit catching, but can be caught for specific error handling.
  *
+ * <h2>Exception Hierarchy</h2>
+ * <pre>
+ * RuntimeException
+ *   └── RocketRestException (base - catch this for all HTTP errors)
+ *         ├── CircuitBreakerOpenException (circuit breaker is open)
+ *         ├── TokenExpiredException (401 - token needs refresh)
+ *         └── ApiException (richer error details from server)
+ * </pre>
+ *
  * <h2>Exception Handling</h2>
- * <pre class="language-java"><code>
+ * <pre class="language-java">{@code
  * try {
  *     User user = client.get("/users/1", User.class);
+ * } catch (CircuitBreakerOpenException e) {
+ *     // Service is down, fail fast
+ *     System.out.println("Service unavailable, retry in " + e.getEstimatedMillisUntilReset() + "ms");
+ * } catch (TokenExpiredException e) {
+ *     // Token expired, re-authenticate
+ *     refreshToken();
  * } catch (RocketRestException e) {
- *     int status = e.getStatusCode();
- *     String body = e.getResponseBody();
- *
- *     if (status == 404) {
- *         System.out.println("User not found");
- *     } else if (status == 401) {
- *         System.out.println("Authentication required");
- *     } else {
- *         System.err.println("Request failed: " + e.getMessage());
- *         System.err.println("Response: " + body);
- *     }
+ *     // All other HTTP errors
+ *     System.err.println("HTTP " + e.getStatusCode() + ": " + e.getMessage());
  * }
- * </code></pre>
+ * }</pre>
  *
  * <h2>Avoiding Exceptions with Fluent API</h2>
- * <pre class="language-java"><code>
+ * <pre class="language-java">{@code
  * // Use fluent API to avoid exception handling
- * Result&lt;User, ApiError&gt; result = client.fluent().get("/users/1", User.class);
+ * Result<User, ApiError> result = client.fluent().get("/users/1", User.class);
  *
  * result.match(
- *     user -&gt; System.out.println("Found: " + user.getName()),
- *     error -&gt; System.out.println("Error " + error.getStatusCode() + ": " + error.getMessage())
+ *     user -> System.out.println("Found: " + user.getName()),
+ *     error -> System.out.println("Error " + error.getStatusCode() + ": " + error.getMessage())
  * );
- * </code></pre>
+ * }</pre>
  *
  * @author guinetik &lt;guinetik@gmail.com&gt;
  * @see CircuitBreakerOpenException
  * @see com.guinetik.rr.auth.TokenExpiredException
+ * @see com.guinetik.rr.api.ApiException
  * @see com.guinetik.rr.result.ApiError
  * @since 1.0.0
  */

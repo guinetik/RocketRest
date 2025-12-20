@@ -1,83 +1,101 @@
 package com.guinetik.rr.api;
 
+import com.guinetik.rr.http.RocketRestException;
+
 /**
- * Runtime exception thrown when an API request fails.
+ * Exception thrown when an API request fails with rich error details.
  *
- * <p>This exception wraps HTTP errors, network failures, and other API-related issues.
- * It provides access to the HTTP status code, error message, and raw response body
- * when available.
+ * <p>This exception extends {@link RocketRestException} and provides additional
+ * context about API failures including the error message from the server.
+ * Use this when you need more details than the base exception provides.
  *
  * <h2>Exception Hierarchy</h2>
  * <pre>
  * RuntimeException
- *   └── ApiException (general API failures)
- *         ├── statusCode: HTTP status code (e.g., 404, 500)
- *         ├── errorMessage: Server error message
- *         └── responseBody: Raw response content
+ *   └── RocketRestException (base HTTP exception)
+ *         ├── CircuitBreakerOpenException
+ *         ├── TokenExpiredException
+ *         └── ApiException (richer error details)
+ *               └── errorMessage: Server error message
  * </pre>
  *
  * <h2>Handling ApiException</h2>
- * <pre class="language-java"><code>
+ * <pre class="language-java">{@code
  * try {
  *     User user = client.get("/users/999", User.class);
  * } catch (ApiException e) {
  *     System.err.println("Status: " + e.getStatusCode());
  *     System.err.println("Message: " + e.getErrorMessage());
  *     System.err.println("Body: " + e.getResponseBody());
+ * } catch (RocketRestException e) {
+ *     // Handles all other HTTP exceptions
+ *     System.err.println("HTTP error: " + e.getStatusCode());
  * }
- * </code></pre>
+ * }</pre>
  *
  * <h2>Avoiding Exceptions with Result Pattern</h2>
  * <p>Consider using the fluent API with {@link com.guinetik.rr.result.Result} to avoid exceptions:
- * <pre class="language-java"><code>
- * Result&lt;User, ApiError&gt; result = client.fluent().get("/users/999", User.class);
+ * <pre class="language-java">{@code
+ * Result<User, ApiError> result = client.fluent().get("/users/999", User.class);
  * result.match(
- *     user -&gt; handleSuccess(user),
- *     error -&gt; handleError(error)  // No exception thrown
+ *     user -> handleSuccess(user),
+ *     error -> handleError(error)  // No exception thrown
  * );
- * </code></pre>
+ * }</pre>
  *
  * @author guinetik &lt;guinetik@gmail.com&gt;
+ * @see RocketRestException
  * @see com.guinetik.rr.result.Result
  * @see com.guinetik.rr.result.ApiError
  * @since 1.0.0
  */
-public class ApiException extends RuntimeException {
+public class ApiException extends RocketRestException {
 
-    private final String responseBody;
+    private static final long serialVersionUID = 1L;
+
     private final String errorMessage;
-    private final int statusCode;
 
+    /**
+     * Creates a new ApiException with full error details.
+     *
+     * @param message The exception message
+     * @param responseBody The raw response body from the server
+     * @param errorMessage The parsed error message from the server
+     * @param statusCode The HTTP status code
+     */
     public ApiException(String message, String responseBody, String errorMessage, int statusCode) {
-        super(message);
-        this.responseBody = responseBody;
+        super(message, statusCode, responseBody);
         this.errorMessage = errorMessage;
-        this.statusCode = statusCode;
     }
 
+    /**
+     * Creates a new ApiException with just a message.
+     *
+     * @param message The exception message
+     */
     public ApiException(String message) {
         super(message);
-        responseBody = null;
-        errorMessage = null;
-        statusCode = -1;
+        this.errorMessage = null;
     }
 
+    /**
+     * Creates a new ApiException with a message and cause.
+     *
+     * @param message The exception message
+     * @param cause The underlying cause
+     */
     public ApiException(String message, Throwable cause) {
         super(message, cause);
-        responseBody = null;
-        errorMessage = null;
-        statusCode = -1;
+        this.errorMessage = null;
     }
 
-    public String getResponseBody() {
-        return responseBody;
-    }
-
+    /**
+     * Gets the parsed error message from the server response.
+     * This is often a more user-friendly message extracted from the response body.
+     *
+     * @return The server error message, or null if not available
+     */
     public String getErrorMessage() {
         return errorMessage;
-    }
-
-    public int getStatusCode() {
-        return statusCode;
     }
 }

@@ -53,16 +53,16 @@ import java.util.regex.Matcher;
  * </code></pre>
  *
  * <h2>Regex URL Matching</h2>
- * <pre class="language-java"><code>
- * // Match any user ID
- * mockClient.addMockResponse("GET", "/users/\\d+", (url, body) -&gt; {
+ * <pre class="language-java">{@code
+ * // Match any user ID (use regex pattern like /users/[0-9]+)
+ * mockClient.addMockResponse("GET", "/users/[0-9]+", (url, body) -> {
  *     // Extract ID from URL and return corresponding user
- *     String id = url.replaceAll(".*/users/(\\d+).*", "$1");
+ *     String id = url.substring(url.lastIndexOf('/') + 1);
  *     User user = new User();
  *     user.setId(Integer.parseInt(id));
  *     return user;
  * }, true);  // true enables regex matching
- * </code></pre>
+ * }</pre>
  *
  * <h2>Simulating Latency</h2>
  * <pre class="language-java"><code>

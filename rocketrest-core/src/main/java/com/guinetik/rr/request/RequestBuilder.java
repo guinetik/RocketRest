@@ -145,6 +145,18 @@ public class RequestBuilder<Req, Res> {
     }
 
     /**
+     * Adds a single query parameter to the request.
+     *
+     * @param name the parameter name.
+     * @param value the parameter value.
+     * @return the builder instance.
+     */
+    public RequestBuilder<Req, Res> queryParam(String name, String value) {
+        this.queryParams.put(name, value);
+        return this;
+    }
+
+    /**
      * Sets the headers for the request.
      *
      * @param headers a map of headers.
