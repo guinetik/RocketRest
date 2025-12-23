@@ -32,15 +32,15 @@ import java.util.List;
  * </pre>
  *
  * <h2>Usage</h2>
- * <pre class="language-java">{@code
+ * <pre class="language-java"><code>
  * RocketClient baseClient = new DefaultHttpClient("https://api.example.com");
  *
- * List<RequestInterceptor> interceptors = new ArrayList<>();
+ * List&lt;RequestInterceptor&gt; interceptors = new ArrayList&lt;&gt;();
  * interceptors.add(new LoggingInterceptor());
  * interceptors.add(new RetryInterceptor(3, 1000));
  *
  * RocketClient client = new InterceptingClient(baseClient, interceptors);
- * }</pre>
+ * </code></pre>
  *
  * @author guinetik &lt;guinetik@gmail.com&gt;
  * @see RequestInterceptor

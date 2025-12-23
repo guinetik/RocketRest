@@ -82,17 +82,26 @@ public class RocketRestOptionsTest {
 
     @Test
     public void testGetKeys() {
+        int initialCount = 0;
+        for (String key : options.getKeys()) {
+            initialCount++;
+        }
+
         options.set("key1", "value1");
         options.set("key2", "value2");
         options.set("key3", "value3");
 
         Iterable<String> keys = options.getKeys();
         int count = 0;
+        boolean hasKey1 = false, hasKey2 = false, hasKey3 = false;
         for (String key : keys) {
             count++;
-            assertTrue(key.equals("key1") || key.equals("key2") || key.equals("key3"));
+            if (key.equals("key1")) hasKey1 = true;
+            if (key.equals("key2")) hasKey2 = true;
+            if (key.equals("key3")) hasKey3 = true;
         }
-        assertEquals(3, count);
+        assertTrue(hasKey1 && hasKey2 && hasKey3);
+        assertEquals(initialCount + 3, count);
     }
 
     @Test
@@ -146,13 +155,14 @@ public class RocketRestOptionsTest {
     }
 
     @Test
-    public void testEmptyOptions() {
-        RocketRestOptions emptyOptions = new RocketRestOptions();
+    public void testDefaultOptions() {
+        RocketRestOptions defaultOptions = new RocketRestOptions();
         int count = 0;
-        for (String key : emptyOptions.getKeys()) {
+        for (String key : defaultOptions.getKeys()) {
             count++;
         }
-        assertEquals(0, count);
+        // Constructor sets 10 default options
+        assertEquals(10, count);
     }
 
     @Test

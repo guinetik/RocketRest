@@ -13,6 +13,7 @@ import java.util.Set;
  *
  * <h2>Available Options</h2>
  * <table border="1">
+ *   <caption>Configuration options for RocketRest clients</caption>
  *   <tr><th>Option</th><th>Type</th><th>Default</th><th>Description</th></tr>
  *   <tr><td>{@link #RETRY_ENABLED}</td><td>Boolean</td><td>true</td><td>Enable automatic retry on failure</td></tr>
  *   <tr><td>{@link #MAX_RETRIES}</td><td>Integer</td><td>3</td><td>Maximum number of retry attempts</td></tr>

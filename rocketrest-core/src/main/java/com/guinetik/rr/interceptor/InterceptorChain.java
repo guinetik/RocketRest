@@ -10,15 +10,15 @@ import com.guinetik.rr.request.RequestSpec;
  * interceptors to retry failed requests or query chain state.
  *
  * <h2>Retry Example</h2>
- * <pre class="language-java">{@code
- * public <Req, Res> Res onError(RocketRestException e, RequestSpec<Req, Res> request,
+ * <pre class="language-java"><code>
+ * public &lt;Req, Res&gt; Res onError(RocketRestException e, RequestSpec&lt;Req, Res&gt; request,
  *                                InterceptorChain chain) throws RocketRestException {
- *     if (isRetryable(e) && chain.getRetryCount() < 3) {
+ *     if (isRetryable(e) &amp;&amp; chain.getRetryCount() &lt; 3) {
  *         return chain.retry(request);
  *     }
  *     throw e;
  * }
- * }</pre>
+ * </code></pre>
  *
  * @author guinetik &lt;guinetik@gmail.com&gt;
  * @see RequestInterceptor

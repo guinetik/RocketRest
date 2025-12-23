@@ -19,48 +19,48 @@ import com.guinetik.rr.request.RequestSpec;
  * </pre>
  *
  * <h2>Creating an Interceptor</h2>
- * <pre class="language-java">{@code
+ * <pre class="language-java"><code>
  * public class LoggingInterceptor implements RequestInterceptor {
  *
- *     @Override
- *     public <Req, Res> RequestSpec<Req, Res> beforeRequest(RequestSpec<Req, Res> request) {
- *         System.out.println("→ " + request.getMethod() + " " + request.getEndpoint());
+ *     &#64;Override
+ *     public &lt;Req, Res&gt; RequestSpec&lt;Req, Res&gt; beforeRequest(RequestSpec&lt;Req, Res&gt; request) {
+ *         System.out.println("-&gt; " + request.getMethod() + " " + request.getEndpoint());
  *         return request;
  *     }
  *
- *     @Override
- *     public <Res> Res afterResponse(Res response, RequestSpec<?, Res> request) {
- *         System.out.println("← Response received");
+ *     &#64;Override
+ *     public &lt;Res&gt; Res afterResponse(Res response, RequestSpec&lt;?, Res&gt; request) {
+ *         System.out.println("&lt;- Response received");
  *         return response;
  *     }
  * }
- * }</pre>
+ * </code></pre>
  *
  * <h2>Retry Interceptor Example</h2>
- * <pre class="language-java">{@code
+ * <pre class="language-java"><code>
  * public class RetryInterceptor implements RequestInterceptor {
  *     private final int maxRetries = 3;
  *
- *     @Override
- *     public <Req, Res> Res onError(RocketRestException e, RequestSpec<Req, Res> request,
+ *     &#64;Override
+ *     public &lt;Req, Res&gt; Res onError(RocketRestException e, RequestSpec&lt;Req, Res&gt; request,
  *                                    InterceptorChain chain) throws RocketRestException {
- *         if (isRetryable(e) && chain.getRetryCount() < maxRetries) {
+ *         if (isRetryable(e) &amp;&amp; chain.getRetryCount() &lt; maxRetries) {
  *             Thread.sleep(1000 * chain.getRetryCount()); // Exponential backoff
  *             return chain.retry(request);
  *         }
  *         throw e;
  *     }
  * }
- * }</pre>
+ * </code></pre>
  *
  * <h2>Using Interceptors</h2>
- * <pre class="language-java">{@code
+ * <pre class="language-java"><code>
  * RocketClient client = RocketClientFactory.builder("https://api.example.com")
  *     .withInterceptor(new LoggingInterceptor())
  *     .withInterceptor(new RetryInterceptor(3, 1000))
  *     .withInterceptor(new MetricsInterceptor())
  *     .build();
- * }</pre>
+ * </code></pre>
  *
  * @author guinetik &lt;guinetik@gmail.com&gt;
  * @see InterceptorChain

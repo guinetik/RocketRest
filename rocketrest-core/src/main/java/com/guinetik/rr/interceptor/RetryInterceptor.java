@@ -35,30 +35,30 @@ import java.util.function.Predicate;
  * </ul>
  *
  * <h2>Basic Usage</h2>
- * <pre class="language-java">{@code
+ * <pre class="language-java"><code>
  * // Retry up to 3 times with 1 second initial delay
  * RetryInterceptor retry = new RetryInterceptor(3, 1000);
  *
  * RocketClient client = RocketClientFactory.builder("https://api.example.com")
  *     .withInterceptor(retry)
  *     .build();
- * }</pre>
+ * </code></pre>
  *
  * <h2>Exponential Backoff</h2>
- * <pre class="language-java">{@code
+ * <pre class="language-java"><code>
  * // Retry with exponential backoff: 1s, 2s, 4s
  * RetryInterceptor retry = new RetryInterceptor(3, 1000, 2.0);
- * }</pre>
+ * </code></pre>
  *
  * <h2>Custom Retry Predicate</h2>
- * <pre class="language-java">{@code
+ * <pre class="language-java"><code>
  * // Only retry on specific status codes
  * RetryInterceptor retry = RetryInterceptor.builder()
  *     .maxRetries(3)
  *     .initialDelayMs(500)
- *     .retryOn(e -> e.getStatusCode() == 503)
+ *     .retryOn(e -&gt; e.getStatusCode() == 503)
  *     .build();
- * }</pre>
+ * </code></pre>
  *
  * @author guinetik &lt;guinetik@gmail.com&gt;
  * @see RequestInterceptor

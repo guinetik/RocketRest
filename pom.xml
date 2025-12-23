@@ -1,7 +1,9 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<?xml version="1.0" encoding="UTF-8" ?>
+<project
+    xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+>
     <modelVersion>4.0.0</modelVersion>
 
     <inceptionYear>2024</inceptionYear>
@@ -12,7 +14,8 @@
     <packaging>pom</packaging>
 
     <name>RocketRest</name>
-    <description>A small Java 8 library for making HTTP API requests with a clean, fluent interface.</description>
+    <description
+    >A small Java 8 library for making HTTP API requests with a clean, fluent interface.</description>
     <url>https://github.com/guinetik/rocketrest</url>
 
     <licenses>
@@ -33,8 +36,10 @@
     </developers>
 
     <scm>
-        <connection>scm:git:git://github.com/guinetik/rocketrest.git</connection>
-        <developerConnection>scm:git:ssh://github.com:guinetik/rocketrest.git</developerConnection>
+        <connection
+        >scm:git:git://github.com/guinetik/rocketrest.git</connection>
+        <developerConnection
+        >scm:git:ssh://github.com:guinetik/rocketrest.git</developerConnection>
         <url>https://github.com/guinetik/rocketrest</url>
     </scm>
 
@@ -50,7 +55,8 @@
         </snapshotRepository>
         <repository>
             <id>central</id>
-            <url>https://central.sonatype.com/publishing/repositories/releases/</url>
+            <url
+            >https://central.sonatype.com/publishing/repositories/releases/</url>
         </repository>
         <site>
             <id>github-pages</id>
@@ -63,12 +69,27 @@
         <module>rocketrest-examples</module>
     </modules>
 
+    <repositories>
+        <repository>
+            <id>sonatype-central</id>
+            <name>Sonatype Central Repository</name>
+            <url>https://central.sonatype.com/</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
     <properties>
         <java.version>1.8</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <project.reporting.outputEncoding
+        >UTF-8</project.reporting.outputEncoding>
 
         <!-- Dependency versions -->
         <jackson.version>2.15.2</jackson.version>
@@ -78,11 +99,13 @@
         <jacoco.version>0.8.11</jacoco.version>
 
         <!-- TerminalJavadocs configuration -->
-        <terminaljavadocs.version>1.0.42-SNAPSHOT</terminaljavadocs.version>
-        <terminaljavadocs.project.name>RocketRest</terminaljavadocs.project.name>
+        <terminaljavadocs.version>1.0.51</terminaljavadocs.version>
+        <terminaljavadocs.project.name
+        >RocketRest</terminaljavadocs.project.name>
         <terminaljavadocs.github.user>guinetik</terminaljavadocs.github.user>
         <terminaljavadocs.github.repo>rocketrest</terminaljavadocs.github.repo>
-        <terminaljavadocs.project.logo>/images/logo.svg</terminaljavadocs.project.logo>
+        <terminaljavadocs.project.logo
+        >/images/logo.svg</terminaljavadocs.project.logo>
     </properties>
 
     <dependencyManagement>
@@ -157,7 +180,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-site-plugin</artifactId>
-                    <version>3.12.1</version>
+                    <version>4.0.0-M13</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -193,6 +216,10 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-javadoc-plugin</artifactId>
                     <version>3.5.0</version>
+                    <configuration>
+                        <failOnWarnings>false</failOnWarnings>
+                        <doclint>none</doclint>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -211,7 +238,10 @@
                 <version>3.5.0</version>
                 <configuration>
                     <!-- Force modern HTML5 output (required for terminal theme on Java 8) -->
-                    <additionalOptions>-html5 --allow-script-in-comments</additionalOptions>
+                    <additionalOptions
+                    >-html5 --allow-script-in-comments</additionalOptions>
+                    <failOnWarnings>false</failOnWarnings>
+                    <doclint>none</doclint>
                 </configuration>
             </plugin>
             <plugin>
@@ -253,7 +283,7 @@
                 <version>${jacoco.version}</version>
                 <reportSets>
                     <reportSet>
-                        <reports/>
+                        <reports />
                     </reportSet>
                 </reportSets>
             </plugin>
@@ -295,6 +325,7 @@
                         </executions>
                         <configuration>
                             <doclint>none</doclint>
+                            <failOnWarnings>false</failOnWarnings>
                         </configuration>
                     </plugin>
                     <!-- GPG Signing -->

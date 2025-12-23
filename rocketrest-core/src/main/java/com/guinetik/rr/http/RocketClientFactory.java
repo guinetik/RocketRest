@@ -70,7 +70,7 @@ import java.util.function.UnaryOperator;
  * </code></pre>
  *
  * <h2>With Interceptors</h2>
- * <pre class="language-java">{@code
+ * <pre class="language-java"><code>
  * // Add retry with exponential backoff
  * RocketClient client = RocketClientFactory.builder("https://api.example.com")
  *     .withRetry(3, 1000)  // 3 retries, 1s initial delay
@@ -81,7 +81,7 @@ import java.util.function.UnaryOperator;
  *     .withInterceptor(new LoggingInterceptor())
  *     .withRetry(3, 1000, 2.0)  // With exponential backoff
  *     .build();
- * }</pre>
+ * </code></pre>
  *
  * @author guinetik &lt;guinetik@gmail.com&gt;
  * @see RocketClient
