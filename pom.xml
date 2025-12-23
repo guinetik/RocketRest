@@ -219,6 +219,9 @@
                     <configuration>
                         <failOnWarnings>false</failOnWarnings>
                         <doclint>none</doclint>
+                        <addStylesheets>
+                            <addStylesheet>javadoc-jdk11-overrides.css</addStylesheet>
+                        </addStylesheets>
                     </configuration>
                 </plugin>
                 <plugin>
@@ -242,6 +245,9 @@
                     >-html5 --allow-script-in-comments</additionalOptions>
                     <failOnWarnings>false</failOnWarnings>
                     <doclint>none</doclint>
+                    <addStylesheets>
+                        <addStylesheet>javadoc-jdk11-overrides.css</addStylesheet>
+                    </addStylesheets>
                 </configuration>
             </plugin>
             <plugin>
