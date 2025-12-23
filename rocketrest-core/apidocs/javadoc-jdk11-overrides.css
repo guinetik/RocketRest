@@ -1,0 +1,381 @@
+/*
+ * Custom CSS overrides for JDK 11 Javadoc with TerminalJavadocs theme
+ *
+ * This file fixes styling issues with JDK 11's javadoc HTML structure that uses:
+ * - <caption> elements with tabbed spans for table headers
+ * - ul.blockList structures for content containers
+ * - Different class names than JDK 17+
+ */
+
+/* ============================================
+ * Caption/Tab Styling (Nested Classes, Constructors, Methods tabs)
+ * JDK 11 uses table.memberSummary > caption with span children
+ * ============================================ */
+
+/* Base caption styling */
+.overviewSummary caption,
+.memberSummary caption,
+.typeSummary caption,
+.useSummary caption,
+.constantsSummary caption,
+.deprecatedSummary caption,
+.requiresSummary caption,
+.packagesSummary caption,
+.providesSummary caption,
+.usesSummary caption {
+    position: relative !important;
+    text-align: left !important;
+    background: transparent !important;
+    color: var(--text-primary, #fafafa) !important;
+    font-weight: 600 !important;
+    clear: none !important;
+    overflow: visible !important;
+    padding: 0 0 0 var(--sp-4, 16px) !important;
+    margin: 0 0 var(--sp-3, 12px) 0 !important;
+    white-space: normal !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: var(--sp-2, 8px) !important;
+}
+
+/* Tab spans - both active and inactive */
+.overviewSummary caption span,
+.memberSummary caption span,
+.typeSummary caption span,
+.useSummary caption span,
+.constantsSummary caption span,
+.deprecatedSummary caption span,
+.requiresSummary caption span,
+.packagesSummary caption span,
+.providesSummary caption span,
+.usesSummary caption span {
+    white-space: nowrap !important;
+    padding: var(--sp-2, 8px) var(--sp-4, 16px) !important;
+    display: inline-block !important;
+    float: left !important;
+    background-color: var(--bg-surface, #1a1a1a) !important;
+    border: 1px solid var(--border-default, hsla(0,0%,100%,.1)) !important;
+    border-radius: var(--radius, 6px) !important;
+    height: auto !important;
+    color: var(--text-secondary, #a1a1a1) !important;
+    font-family: var(--font-mono, monospace) !important;
+    font-size: var(--text-xs, 11px) !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.03em !important;
+    text-transform: uppercase !important;
+    transition: all var(--transition, 150ms ease) !important;
+    margin: 0 !important;
+    cursor: pointer !important;
+}
+
+/* Active tab styling (terminal green accent) */
+.memberSummary caption span.activeTableTab,
+.memberSummary caption span.activeTableTab span,
+.packagesSummary caption span.activeTableTab,
+.packagesSummary caption span.activeTableTab span,
+.overviewSummary caption span.activeTableTab,
+.overviewSummary caption span.activeTableTab span,
+.typeSummary caption span.activeTableTab,
+.typeSummary caption span.activeTableTab span {
+    background-color: var(--accent, #00ff41) !important;
+    border-color: var(--accent, #00ff41) !important;
+    color: var(--bg-void, #000) !important;
+    font-weight: 600 !important;
+}
+
+/* Inactive tab styling */
+.memberSummary caption span.tableTab,
+.memberSummary caption span.tableTab span,
+.packagesSummary caption span.tableTab,
+.packagesSummary caption span.tableTab span,
+.overviewSummary caption span.tableTab,
+.overviewSummary caption span.tableTab span,
+.typeSummary caption span.tableTab,
+.typeSummary caption span.tableTab span {
+    background-color: var(--bg-surface, #1a1a1a) !important;
+    border-color: var(--border-default, hsla(0,0%,100%,.1)) !important;
+    color: var(--text-secondary, #a1a1a1) !important;
+}
+
+/* Tab hover effect */
+.memberSummary caption span.tableTab:hover,
+.memberSummary caption span.tableTab span:hover,
+.packagesSummary caption span.tableTab:hover,
+.overviewSummary caption span.tableTab:hover,
+.typeSummary caption span.tableTab:hover {
+    background-color: var(--bg-hover, #222) !important;
+    color: var(--accent, #00ff41) !important;
+    border-color: var(--accent-dim, #0c3) !important;
+}
+
+/* Hide the tabEnd spans (they were used for rounded corners in old theme) */
+.overviewSummary .tabEnd,
+.memberSummary .tabEnd,
+.typeSummary .tabEnd,
+.useSummary .tabEnd,
+.constantsSummary .tabEnd,
+.deprecatedSummary .tabEnd,
+.requiresSummary .tabEnd,
+.packagesSummary .tabEnd,
+.providesSummary .tabEnd,
+.usesSummary .tabEnd {
+    display: none !important;
+}
+
+/* ============================================
+ * Table Styling
+ * ============================================ */
+
+.overviewSummary,
+.memberSummary,
+.typeSummary,
+.useSummary,
+.constantsSummary,
+.deprecatedSummary,
+.requiresSummary,
+.packagesSummary,
+.providesSummary,
+.usesSummary {
+    width: 100% !important;
+    border-spacing: 0 !important;
+    border: 1px solid var(--border-default, hsla(0,0%,100%,.1)) !important;
+    border-radius: var(--radius, 6px) !important;
+    background-color: var(--bg-raised, #111) !important;
+    margin-bottom: var(--sp-5, 24px) !important;
+    overflow: hidden !important;
+}
+
+/* Table header row */
+.overviewSummary th,
+.memberSummary th,
+.typeSummary th,
+.useSummary th,
+.constantsSummary th,
+.deprecatedSummary th {
+    background: var(--bg-surface, #1a1a1a) !important;
+    border-bottom: 1px solid var(--border-default, hsla(0,0%,100%,.1)) !important;
+    color: var(--text-primary, #fafafa) !important;
+    font-family: var(--font-display, sans-serif) !important;
+    font-size: var(--text-xs, 11px) !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase !important;
+    padding: var(--sp-3, 12px) var(--sp-4, 16px) !important;
+    text-align: left !important;
+}
+
+/* Table cells */
+.overviewSummary td,
+.memberSummary td,
+.typeSummary td,
+.useSummary td,
+.constantsSummary td,
+.deprecatedSummary td {
+    padding: var(--sp-3, 12px) var(--sp-4, 16px) !important;
+    border-bottom: 1px solid var(--border-subtle, hsla(0,0%,100%,.06)) !important;
+    color: var(--text-secondary, #a1a1a1) !important;
+    font-family: var(--font-mono, monospace) !important;
+    font-size: var(--text-sm, 13px) !important;
+    vertical-align: top !important;
+}
+
+/* Alternating row colors */
+.altColor,
+.altColor th {
+    background-color: var(--bg-raised, #111) !important;
+}
+
+.rowColor,
+.rowColor th {
+    background-color: var(--bg-base, #0a0a0a) !important;
+}
+
+/* Row hover effect */
+.altColor:hover td,
+.rowColor:hover td {
+    background-color: var(--accent-subtle, rgba(0,255,65,.08)) !important;
+}
+
+/* Column-specific styling */
+th.colFirst,
+th.colSecond,
+th.colLast,
+th.colConstructorName,
+th.colDeprecatedItemName {
+    background: var(--bg-surface, #1a1a1a) !important;
+    color: var(--text-primary, #fafafa) !important;
+    padding: var(--sp-3, 12px) var(--sp-4, 16px) !important;
+}
+
+td.colFirst,
+td.colSecond,
+td.colLast,
+th.colConstructorName {
+    font-family: var(--font-mono, monospace) !important;
+    font-size: var(--text-sm, 13px) !important;
+}
+
+/* ============================================
+ * BlockList Container Styling
+ * ============================================ */
+
+ul.blockList,
+ul.blockListLast {
+    margin: var(--sp-5, 24px) 0 !important;
+    padding: 0 !important;
+    list-style: none !important;
+}
+
+ul.blockList li.blockList,
+ul.blockListLast li.blockList {
+    list-style: none !important;
+    margin-bottom: var(--sp-5, 24px) !important;
+    line-height: 1.6 !important;
+}
+
+/* Nested blockList - these are the content containers */
+ul.blockList ul.blockList li.blockList,
+ul.blockList ul.blockListLast li.blockList {
+    padding: var(--sp-4, 16px) var(--sp-5, 24px) !important;
+    border: 1px solid var(--border-default, hsla(0,0%,100%,.1)) !important;
+    border-radius: var(--radius, 6px) !important;
+    background-color: var(--bg-raised, #111) !important;
+}
+
+/* Deeper nested blockList */
+ul.blockList ul.blockList ul.blockList li.blockList,
+ul.blockList ul.blockList ul.blockListLast li.blockList {
+    padding: var(--sp-3, 12px) 0 var(--sp-3, 12px) var(--sp-4, 16px) !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-left: 2px solid var(--accent-dim, #0c3) !important;
+    border-radius: 0 !important;
+}
+
+ul.blockList ul.blockList ul.blockList ul.blockList li.blockList {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    padding-bottom: var(--sp-4, 16px) !important;
+    border: none !important;
+}
+
+ul.blockList ul.blockList ul.blockList ul.blockList li.blockListLast {
+    list-style: none !important;
+    border-bottom: none !important;
+    padding-bottom: 0 !important;
+}
+
+/* ============================================
+ * Section Headers (h3, h4) in blockLists
+ * ============================================ */
+
+div.details ul.blockList ul.blockList ul.blockList li.blockList h4,
+div.details ul.blockList ul.blockList ul.blockListLast li.blockList h4 {
+    background-color: var(--bg-surface, #1a1a1a) !important;
+    border: 1px solid var(--border-default, hsla(0,0%,100%,.1)) !important;
+    border-radius: var(--radius, 6px) !important;
+    margin: 0 0 var(--sp-3, 12px) 0 !important;
+    padding: var(--sp-2, 8px) var(--sp-3, 12px) !important;
+    color: var(--accent, #00ff41) !important;
+    font-family: var(--font-display, sans-serif) !important;
+    font-size: var(--text-base, 14px) !important;
+}
+
+ul.blockList ul.blockList ul.blockList li.blockList h3 {
+    background-color: var(--bg-surface, #1a1a1a) !important;
+    border: 1px solid var(--border-default, hsla(0,0%,100%,.1)) !important;
+    border-radius: var(--radius, 6px) !important;
+    margin: 0 0 var(--sp-3, 12px) 0 !important;
+    padding: var(--sp-2, 8px) var(--sp-3, 12px) !important;
+    color: var(--cyan, #00e5ff) !important;
+    font-family: var(--font-display, sans-serif) !important;
+}
+
+ul.blockList ul.blockList li.blockList h3 {
+    padding: 0 !important;
+    margin: var(--sp-5, 24px) 0 var(--sp-3, 12px) 0 !important;
+    color: var(--cyan, #00e5ff) !important;
+}
+
+ul.blockList li.blockList h2 {
+    padding: 0 0 var(--sp-4, 16px) 0 !important;
+    color: var(--text-primary, #fafafa) !important;
+}
+
+/* ============================================
+ * Description/Content Blocks
+ * ============================================ */
+
+div.block {
+    font-size: var(--text-base, 14px) !important;
+    font-family: var(--font-body, monospace) !important;
+    color: var(--text-secondary, #a1a1a1) !important;
+    line-height: 1.7 !important;
+    margin: var(--sp-3, 12px) 0 !important;
+}
+
+td.colLast div {
+    padding-top: 0 !important;
+}
+
+td.colLast a {
+    padding-bottom: var(--sp-1, 4px) !important;
+}
+
+/* ============================================
+ * Method/Constructor Signature Pre blocks
+ * ============================================ */
+
+.methodSignature {
+    white-space: pre-wrap !important;
+    color: var(--accent, #00ff41) !important;
+    font-family: var(--font-mono, monospace) !important;
+    background: var(--bg-base, #0a0a0a) !important;
+    padding: var(--sp-3, 12px) !important;
+    border: 1px solid var(--border-default, hsla(0,0%,100%,.1)) !important;
+    border-radius: var(--radius, 6px) !important;
+    margin: var(--sp-2, 8px) 0 !important;
+}
+
+/* ============================================
+ * Links in tables
+ * ============================================ */
+
+td.colFirst a:link,
+td.colFirst a:visited,
+td.colSecond a:link,
+td.colSecond a:visited,
+th.colFirst a:link,
+th.colFirst a:visited,
+th.colSecond a:link,
+th.colSecond a:visited,
+th.colConstructorName a:link,
+th.colConstructorName a:visited,
+th.colDeprecatedItemName a:link,
+th.colDeprecatedItemName a:visited {
+    color: var(--link, #39ff14) !important;
+    font-weight: 600 !important;
+}
+
+td.colFirst a:hover,
+td.colSecond a:hover,
+th.colFirst a:hover,
+th.colSecond a:hover,
+th.colConstructorName a:hover {
+    color: var(--link-hover, #7fff00) !important;
+    text-shadow: 0 0 8px var(--link-glow, rgba(57,255,20,.25)) !important;
+}
+
+/* ============================================
+ * Navigation bar overrides for JDK 11 structure
+ * ============================================ */
+
+.navBarCell1Rev {
+    background-color: var(--accent, #00ff41) !important;
+    color: var(--bg-void, #000) !important;
+    border-radius: var(--radius, 6px) !important;
+    font-weight: 600 !important;
+    padding: var(--sp-2, 8px) var(--sp-3, 12px) !important;
+}

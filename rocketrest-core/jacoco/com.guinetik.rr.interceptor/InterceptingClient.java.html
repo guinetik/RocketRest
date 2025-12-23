@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InterceptingClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.interceptor</a> &gt; <span class="el_source">InterceptingClient.java</span></div><h1>InterceptingClient.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.interceptor;
+
+import com.guinetik.rr.http.RocketClient;
+import com.guinetik.rr.http.RocketRestException;
+import com.guinetik.rr.request.RequestSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.net.ssl.SSLContext;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
+/**
+ * Decorator that adds interceptor chain support to any {@link RocketClient}.
+ *
+ * &lt;p&gt;This client wraps another RocketClient and applies a chain of interceptors
+ * to every request. Interceptors can modify requests, transform responses,
+ * and handle errors including retry logic.
+ *
+ * &lt;h2&gt;Interceptor Execution Order&lt;/h2&gt;
+ * &lt;pre&gt;
+ * Request Flow:
+ *   beforeRequest(Interceptor 1) → beforeRequest(Interceptor 2) → ... → delegate.execute()
+ *
+ * Response Flow:
+ *   delegate.execute() → ... → afterResponse(Interceptor 2) → afterResponse(Interceptor 1)
+ *
+ * Error Flow:
+ *   exception → onError(Interceptor 1) → onError(Interceptor 2) → ...
+ * &lt;/pre&gt;
+ *
+ * &lt;h2&gt;Usage&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketClient baseClient = new DefaultHttpClient(&quot;https://api.example.com&quot;);
+ *
+ * List&amp;lt;RequestInterceptor&amp;gt; interceptors = new ArrayList&amp;lt;&amp;gt;();
+ * interceptors.add(new LoggingInterceptor());
+ * interceptors.add(new RetryInterceptor(3, 1000));
+ *
+ * RocketClient client = new InterceptingClient(baseClient, interceptors);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see RequestInterceptor
+ * @see RocketClient
+ * @since 1.1.0
+ */
+public class InterceptingClient implements RocketClient {
+
+<span class="fc" id="L52">    private static final Logger logger = LoggerFactory.getLogger(InterceptingClient.class);</span>
+
+    private final RocketClient delegate;
+    private final List&lt;RequestInterceptor&gt; interceptors;
+    private final int maxRetries;
+
+    /**
+     * Creates an intercepting client with the given interceptors.
+     *
+     * @param delegate The underlying client to wrap
+     * @param interceptors The interceptors to apply (will be sorted by order)
+     */
+    public InterceptingClient(RocketClient delegate, List&lt;RequestInterceptor&gt; interceptors) {
+<span class="fc" id="L65">        this(delegate, interceptors, 3);</span>
+<span class="fc" id="L66">    }</span>
+
+    /**
+     * Creates an intercepting client with the given interceptors and retry limit.
+     *
+     * @param delegate The underlying client to wrap
+     * @param interceptors The interceptors to apply (will be sorted by order)
+     * @param maxRetries The maximum number of retries allowed
+     */
+<span class="fc" id="L75">    public InterceptingClient(RocketClient delegate, List&lt;RequestInterceptor&gt; interceptors, int maxRetries) {</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (delegate == null) {</span>
+<span class="fc" id="L77">            throw new NullPointerException(&quot;delegate must not be null&quot;);</span>
+        }
+<span class="fc" id="L79">        this.delegate = delegate;</span>
+<span class="fc" id="L80">        this.maxRetries = maxRetries;</span>
+
+        // Sort interceptors by order and make immutable copy
+<span class="fc" id="L83">        List&lt;RequestInterceptor&gt; sorted = new ArrayList&lt;RequestInterceptor&gt;(</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            interceptors != null ? interceptors : Collections.&lt;RequestInterceptor&gt;emptyList()</span>
+        );
+<span class="fc" id="L86">        Collections.sort(sorted, new Comparator&lt;RequestInterceptor&gt;() {</span>
+            @Override
+            public int compare(RequestInterceptor a, RequestInterceptor b) {
+<span class="fc" id="L89">                return Integer.compare(a.getOrder(), b.getOrder());</span>
+            }
+        });
+<span class="fc" id="L92">        this.interceptors = Collections.unmodifiableList(sorted);</span>
+<span class="fc" id="L93">    }</span>
+
+    @Override
+    public &lt;Req, Res&gt; Res execute(RequestSpec&lt;Req, Res&gt; requestSpec) throws RocketRestException {
+<span class="fc" id="L97">        return executeWithRetry(requestSpec, 0);</span>
+    }
+
+    /**
+     * Executes the request with retry support.
+     */
+    private &lt;Req, Res&gt; Res executeWithRetry(RequestSpec&lt;Req, Res&gt; requestSpec, int retryCount)
+            throws RocketRestException {
+
+<span class="fc" id="L106">        final int currentRetry = retryCount;</span>
+
+        // Create chain context for this execution
+<span class="fc" id="L109">        InterceptorChain chain = new InterceptorChain() {</span>
+            @Override
+            public &lt;R, S&gt; S retry(RequestSpec&lt;R, S&gt; request) throws RocketRestException {
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                if (currentRetry &gt;= maxRetries) {</span>
+<span class="nc" id="L113">                    throw new RocketRestException(&quot;Maximum retry count exceeded: &quot; + maxRetries);</span>
+                }
+<span class="fc" id="L115">                logger.debug(&quot;Retrying request (attempt {}): {} {}&quot;,</span>
+<span class="fc" id="L116">                    currentRetry + 1, request.getMethod(), request.getEndpoint());</span>
+<span class="fc" id="L117">                return executeWithRetry(request, currentRetry + 1);</span>
+            }
+
+            @Override
+            public int getRetryCount() {
+<span class="fc" id="L122">                return currentRetry;</span>
+            }
+
+            @Override
+            public int getMaxRetries() {
+<span class="nc" id="L127">                return maxRetries;</span>
+            }
+        };
+
+        // Apply beforeRequest interceptors (in order)
+<span class="fc" id="L132">        RequestSpec&lt;Req, Res&gt; currentRequest = requestSpec;</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (RequestInterceptor interceptor : interceptors) {</span>
+<span class="fc" id="L134">            currentRequest = interceptor.beforeRequest(currentRequest);</span>
+<span class="fc" id="L135">        }</span>
+
+        try {
+            // Execute the actual request
+<span class="fc" id="L139">            Res response = delegate.execute(currentRequest);</span>
+
+            // Apply afterResponse interceptors (in reverse order)
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            for (int i = interceptors.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L143">                response = interceptors.get(i).afterResponse(response, currentRequest);</span>
+            }
+
+<span class="fc" id="L146">            return response;</span>
+
+<span class="fc" id="L148">        } catch (RocketRestException e) {</span>
+            // Apply onError interceptors (in order) - first one to return wins
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            for (RequestInterceptor interceptor : interceptors) {</span>
+                try {
+<span class="fc" id="L152">                    Res recovered = interceptor.onError(e, currentRequest, chain);</span>
+                    // If we get here, the interceptor recovered - apply afterResponse
+<span class="fc bfc" id="L154" title="All 2 branches covered.">                    for (int i = interceptors.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L155">                        recovered = interceptors.get(i).afterResponse(recovered, currentRequest);</span>
+                    }
+<span class="fc" id="L157">                    return recovered;</span>
+<span class="fc" id="L158">                } catch (RocketRestException rethrown) {</span>
+                    // Interceptor rethrew (possibly modified) exception, continue to next
+<span class="fc" id="L160">                    e = rethrown;</span>
+                }
+<span class="fc" id="L162">            }</span>
+            // All interceptors rethrew, propagate the last exception
+<span class="fc" id="L164">            throw e;</span>
+        }
+    }
+
+    @Override
+    public void configureSsl(SSLContext sslContext) {
+<span class="nc" id="L170">        delegate.configureSsl(sslContext);</span>
+<span class="nc" id="L171">    }</span>
+
+    @Override
+    public void setBaseUrl(String baseUrl) {
+<span class="nc" id="L175">        delegate.setBaseUrl(baseUrl);</span>
+<span class="nc" id="L176">    }</span>
+
+    /**
+     * Gets the list of interceptors in execution order.
+     *
+     * @return Unmodifiable list of interceptors
+     */
+    public List&lt;RequestInterceptor&gt; getInterceptors() {
+<span class="fc" id="L184">        return interceptors;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

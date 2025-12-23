@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RocketRestSecureConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr</a> &gt; <span class="el_source">RocketRestSecureConfig.java</span></div><h1>RocketRestSecureConfig.java</h1><pre class="source lang-java linenums">package com.guinetik.rr;
+
+import com.guinetik.rr.auth.AuthStrategy;
+import com.guinetik.rr.auth.RocketSSL;
+
+import java.util.function.Consumer;
+
+/**
+ * Extended configuration for {@link RocketRest} clients requiring custom SSL/TLS certificates.
+ *
+ * &lt;p&gt;This class extends {@link RocketRestConfig} to provide support for custom SSL certificates,
+ * enabling secure connections to APIs that use self-signed certificates, custom certificate
+ * authorities, or require mutual TLS (mTLS) authentication.
+ *
+ * &lt;h2&gt;When to Use&lt;/h2&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;Connecting to APIs with self-signed SSL certificates&lt;/li&gt;
+ *   &lt;li&gt;Corporate environments with internal certificate authorities&lt;/li&gt;
+ *   &lt;li&gt;Mutual TLS (mTLS) authentication requirements&lt;/li&gt;
+ *   &lt;li&gt;Development/staging environments with non-production certificates&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;h2&gt;Basic Usage&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketRestSecureConfig config = RocketRestSecureConfig
+ *     .secureBuilder(&quot;https://secure-api.internal.corp&quot;)
+ *     .withCustomCertificate(&quot;/path/to/keystore.p12&quot;, &quot;keystorePassword&quot;)
+ *     .authStrategy(AuthStrategyFactory.createBearerToken(&quot;api-token&quot;))
+ *     .build();
+ *
+ * RocketRest client = new RocketRest(config);
+ * SecureData data = client.get(&quot;/secure/data&quot;, SecureData.class);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;With OAuth2 and Custom Certificate&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketRestSecureConfig config = RocketRestSecureConfig
+ *     .secureBuilder(&quot;https://api.internal.corp&quot;)
+ *     .withCustomCertificate(&quot;client-cert.p12&quot;, &quot;certPassword&quot;)
+ *     .authStrategy(AuthStrategyFactory.createOAuth2ClientCredentials(
+ *         &quot;client-id&quot;,
+ *         &quot;client-secret&quot;,
+ *         &quot;https://auth.internal.corp/oauth/token&quot;
+ *     ))
+ *     .tokenUrl(&quot;https://auth.internal.corp/oauth/token&quot;)
+ *     .defaultOptions(opts -&amp;gt; {
+ *         opts.set(RocketRestOptions.RETRY_ENABLED, true);
+ *         opts.set(RocketRestOptions.MAX_RETRIES, 3);
+ *     })
+ *     .build();
+ *
+ * RocketRest client = new RocketRest(config);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see RocketRestConfig
+ * @see RocketSSL
+ * @see RocketRest
+ * @since 1.0.0
+ */
+public class RocketRestSecureConfig extends RocketRestConfig implements RocketSSL.SSLConfig {
+    /**
+     * Builder for creating RocketRestSecureConfig instances.
+     */
+    public static class SecureBuilder extends RocketRestConfig.Builder {
+        private boolean customCertificateEnabled;
+        private String customCertificateFilename;
+        private String customCertificatePassword;
+
+        protected SecureBuilder(String serviceUrl) {
+<span class="nc" id="L71">            super(serviceUrl);</span>
+<span class="nc" id="L72">        }</span>
+
+        /**
+         * Enables a custom SSL certificate with the given filename and password.
+         *
+         * @param filename the custom certificate filename
+         * @param password the custom certificate password
+         * @return this builder instance
+         */
+        public SecureBuilder withCustomCertificate(String filename, String password) {
+<span class="nc" id="L82">            this.customCertificateEnabled = true;</span>
+<span class="nc" id="L83">            this.customCertificateFilename = filename;</span>
+<span class="nc" id="L84">            this.customCertificatePassword = password;</span>
+<span class="nc" id="L85">            return this;</span>
+        }
+
+        @Override
+        public SecureBuilder tokenUrl(String tokenUrl) {
+<span class="nc" id="L90">            super.tokenUrl(tokenUrl);</span>
+<span class="nc" id="L91">            return this;</span>
+        }
+
+        @Override
+        public SecureBuilder authStrategy(AuthStrategy authStrategy) {
+<span class="nc" id="L96">            super.authStrategy(authStrategy);</span>
+<span class="nc" id="L97">            return this;</span>
+        }
+
+        @Override
+        public SecureBuilder defaultOptions(Consumer&lt;RocketRestOptions&gt; optionsConfigurer) {
+<span class="nc" id="L102">            super.defaultOptions(optionsConfigurer);</span>
+<span class="nc" id="L103">            return this;</span>
+        }
+
+        @Override
+        public SecureBuilder defaultOption(String key, Object value) {
+<span class="nc" id="L108">            super.defaultOption(key, value);</span>
+<span class="nc" id="L109">            return this;</span>
+        }
+
+        /**
+         * Builds a new RocketRestSecureConfig instance.
+         *
+         * @return a new RocketRestSecureConfig instance
+         */
+        @Override
+        public RocketRestSecureConfig build() {
+<span class="nc" id="L119">            return new RocketRestSecureConfig(this);</span>
+        }
+    }
+    // Certificate options
+    private final boolean customCertificateEnabled;
+    private final String customCertificateFilename;
+    private final String customCertificatePassword;
+
+    // Package-private constructor for access by SecureBuilder
+    protected RocketRestSecureConfig(SecureBuilder builder) {
+        // Use the protected constructor from a parent
+<span class="nc" id="L130">        super(builder);</span>
+<span class="nc" id="L131">        this.customCertificateEnabled = builder.customCertificateEnabled;</span>
+<span class="nc" id="L132">        this.customCertificateFilename = builder.customCertificateFilename;</span>
+<span class="nc" id="L133">        this.customCertificatePassword = builder.customCertificatePassword;</span>
+<span class="nc" id="L134">    }</span>
+
+    /**
+     * Checks if a custom SSL certificate is enabled.
+     *
+     * @return true if a custom certificate is enabled
+     */
+    public boolean isCustomCertificateEnabled() {
+<span class="nc" id="L142">        return customCertificateEnabled;</span>
+    }
+
+    /**
+     * Gets the custom certificate filename.
+     *
+     * @return the custom certificate filename
+     */
+    public String getCustomCertificateFilename() {
+<span class="nc" id="L151">        return customCertificateFilename;</span>
+    }
+
+    /**
+     * Gets the custom certificate password.
+     *
+     * @return the custom certificate password
+     */
+    public String getCustomCertificatePassword() {
+<span class="nc" id="L160">        return customCertificatePassword;</span>
+    }
+
+    /**
+     * Creates a new secure builder for RocketRestConfig.
+     *
+     * @param serviceUrl the base URL for the API service
+     * @return a new secure builder instance
+     */
+    public static SecureBuilder secureBuilder(String serviceUrl) {
+<span class="nc" id="L170">        return new SecureBuilder(serviceUrl);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

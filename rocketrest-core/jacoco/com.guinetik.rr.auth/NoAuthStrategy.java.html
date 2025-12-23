@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NoAuthStrategy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.auth</a> &gt; <span class="el_source">NoAuthStrategy.java</span></div><h1>NoAuthStrategy.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.auth;
+
+import com.guinetik.rr.http.RocketHeaders;
+
+/**
+ * Authentication strategy that performs no authentication.
+ *
+ * &lt;p&gt;This is the default strategy used when no authentication is configured.
+ * It does not add any authentication headers to requests.
+ *
+ * &lt;h2&gt;Usage&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Explicitly create no-auth strategy
+ * AuthStrategy auth = AuthStrategyFactory.createNoAuth();
+ *
+ * // Or simply don't set an auth strategy (default behavior)
+ * RocketRestConfig config = RocketRestConfig.builder(&quot;https://public-api.example.com&quot;)
+ *     .build();  // Uses NoAuthStrategy by default
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see AuthStrategy
+ * @see AuthStrategyFactory#createNoAuth()
+ * @since 1.0.0
+ */
+<span class="fc" id="L26">public class NoAuthStrategy implements AuthStrategy {</span>
+
+    @Override
+    public AuthType getType() {
+<span class="nc" id="L30">        return AuthType.NONE;</span>
+    }
+
+    @Override
+    public RocketHeaders applyAuthHeaders(RocketHeaders headers) {
+        // No headers to apply
+<span class="fc" id="L36">        return headers;</span>
+    }
+
+    @Override
+    public boolean needsTokenRefresh() {
+<span class="fc" id="L41">        return false;</span>
+    }
+
+    @Override
+    public boolean refreshCredentials() {
+        // Nothing to refresh
+<span class="fc" id="L47">        return true;</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

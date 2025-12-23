@@ -1,0 +1,443 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RocketClientFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.http</a> &gt; <span class="el_source">RocketClientFactory.java</span></div><h1>RocketClientFactory.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.http;
+
+import com.guinetik.rr.RocketRestConfig;
+import com.guinetik.rr.RocketRestOptions;
+import com.guinetik.rr.auth.RocketSSL;
+import com.guinetik.rr.interceptor.InterceptingClient;
+import com.guinetik.rr.interceptor.RequestInterceptor;
+import com.guinetik.rr.interceptor.RetryInterceptor;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
+
+/**
+ * Factory for creating and configuring HTTP clients with decorators and settings.
+ *
+ * &lt;p&gt;This factory provides a fluent builder API for constructing {@link RocketClient}
+ * instances with various configurations like circuit breakers, custom decorators,
+ * and async execution support.
+ *
+ * &lt;h2&gt;Simple Client&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketClient client = RocketClientFactory.builder(&quot;https://api.example.com&quot;)
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;With Circuit Breaker&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketClient client = RocketClientFactory.builder(&quot;https://api.example.com&quot;)
+ *     .withCircuitBreaker(5, 30000)  // 5 failures, 30s timeout
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;From Configuration&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketRestConfig config = RocketRestConfig.builder(&quot;https://api.example.com&quot;)
+ *     .authStrategy(AuthStrategyFactory.createBearerToken(&quot;token&quot;))
+ *     .build();
+ *
+ * RocketClient client = RocketClientFactory.fromConfig(config)
+ *     .withCircuitBreaker()
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Async Client&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * ExecutorService executor = Executors.newFixedThreadPool(4);
+ *
+ * AsyncHttpClient asyncClient = RocketClientFactory.builder(&quot;https://api.example.com&quot;)
+ *     .withExecutorService(executor)
+ *     .buildAsync();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Fluent Client (Result Pattern)&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * FluentHttpClient fluentClient = RocketClientFactory.builder(&quot;https://api.example.com&quot;)
+ *     .buildFluent();
+ *
+ * Result&amp;lt;User, ApiError&amp;gt; result = fluentClient.executeWithResult(request);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Custom Decorator&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketClient client = RocketClientFactory.builder(&quot;https://api.example.com&quot;)
+ *     .withCircuitBreaker()
+ *     .withCustomDecorator(base -&amp;gt; new LoggingClientDecorator(base))
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;With Interceptors&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Add retry with exponential backoff
+ * RocketClient client = RocketClientFactory.builder(&quot;https://api.example.com&quot;)
+ *     .withRetry(3, 1000)  // 3 retries, 1s initial delay
+ *     .build();
+ *
+ * // Multiple interceptors
+ * RocketClient client = RocketClientFactory.builder(&quot;https://api.example.com&quot;)
+ *     .withInterceptor(new LoggingInterceptor())
+ *     .withRetry(3, 1000, 2.0)  // With exponential backoff
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see RocketClient
+ * @see CircuitBreakerClient
+ * @see FluentHttpClient
+ * @see RequestInterceptor
+ * @see RetryInterceptor
+ * @since 1.0.0
+ */
+<span class="nc" id="L94">public class RocketClientFactory {</span>
+
+    // Function type for client provider used in testing/mocking
+<span class="fc" id="L97">    private static UnaryOperator&lt;RocketRestConfig&gt; clientProvider = null;</span>
+
+    /**
+     * Sets a custom client provider for testing/mocking.
+     * This allows tests to inject mock clients.
+     * 
+     * @param provider The provider function
+     */
+    public static void setClientProvider(UnaryOperator&lt;RocketRestConfig&gt; provider) {
+<span class="nc" id="L106">        clientProvider = provider;</span>
+<span class="nc" id="L107">    }</span>
+    
+    /**
+     * Resets the client provider to the default.
+     */
+    public static void resetToDefault() {
+<span class="nc" id="L113">        clientProvider = null;</span>
+<span class="nc" id="L114">    }</span>
+
+    /**
+     * Builder class for constructing RocketClient instances with various decorators.
+     */
+    public static class Builder {
+        private final String baseUrl;
+        private RocketRestOptions options;
+        private ExecutorService executorService;
+<span class="fc" id="L123">        private boolean enableCircuitBreaker = false;</span>
+<span class="fc" id="L124">        private int failureThreshold = HttpConstants.CircuitBreaker.DEFAULT_FAILURE_THRESHOLD;</span>
+<span class="fc" id="L125">        private long resetTimeoutMs = HttpConstants.CircuitBreaker.DEFAULT_RESET_TIMEOUT_MS;</span>
+<span class="fc" id="L126">        private long failureDecayTimeMs = HttpConstants.CircuitBreaker.DEFAULT_FAILURE_DECAY_TIME_MS;</span>
+<span class="fc" id="L127">        private CircuitBreakerClient.FailurePolicy failurePolicy = CircuitBreakerClient.FailurePolicy.ALL_EXCEPTIONS;</span>
+<span class="fc" id="L128">        private Predicate&lt;RocketRestException&gt; failurePredicate = null;</span>
+<span class="fc" id="L129">        private UnaryOperator&lt;RocketClient&gt; customDecorator = null;</span>
+<span class="fc" id="L130">        private List&lt;RequestInterceptor&gt; interceptors = new ArrayList&lt;RequestInterceptor&gt;();</span>
+<span class="fc" id="L131">        private int interceptorMaxRetries = 3;</span>
+
+<span class="fc" id="L133">        private Builder(String baseUrl) {</span>
+<span class="fc" id="L134">            this.baseUrl = baseUrl;</span>
+<span class="fc" id="L135">            this.options = new RocketRestOptions();</span>
+<span class="fc" id="L136">        }</span>
+
+        /**
+         * Sets the client options.
+         *
+         * @param options The RocketRestOptions to use
+         * @return this builder instance
+         */
+        public Builder withOptions(RocketRestOptions options) {
+<span class="fc" id="L145">            this.options = options;</span>
+<span class="fc" id="L146">            return this;</span>
+        }
+
+        /**
+         * Sets the executor service for async operations.
+         *
+         * @param executorService The executor service to use
+         * @return this builder instance
+         */
+        public Builder withExecutorService(ExecutorService executorService) {
+<span class="fc" id="L156">            this.executorService = executorService;</span>
+<span class="fc" id="L157">            return this;</span>
+        }
+
+        /**
+         * Enables the circuit breaker pattern with default settings.
+         *
+         * @return this builder instance
+         */
+        public Builder withCircuitBreaker() {
+<span class="nc" id="L166">            this.enableCircuitBreaker = true;</span>
+<span class="nc" id="L167">            return this;</span>
+        }
+
+        /**
+         * Enables the circuit breaker pattern with custom settings.
+         *
+         * @param failureThreshold Number of failures before opening circuit
+         * @param resetTimeoutMs   Timeout in ms before trying to close the circuit
+         * @return this builder instance
+         */
+        public Builder withCircuitBreaker(int failureThreshold, long resetTimeoutMs) {
+<span class="nc" id="L178">            this.enableCircuitBreaker = true;</span>
+<span class="nc" id="L179">            this.failureThreshold = failureThreshold;</span>
+<span class="nc" id="L180">            this.resetTimeoutMs = resetTimeoutMs;</span>
+<span class="nc" id="L181">            return this;</span>
+        }
+
+        /**
+         * Enables the circuit breaker pattern with fully customized settings.
+         *
+         * @param failureThreshold   Number of failures before opening circuit
+         * @param resetTimeoutMs     Timeout in ms before trying to close the circuit
+         * @param failureDecayTimeMs Time after which failure count starts to decay
+         * @param failurePolicy      Strategy to determine what counts as a failure
+         * @return this builder instance
+         */
+        public Builder withCircuitBreaker(int failureThreshold, long resetTimeoutMs,
+                                          long failureDecayTimeMs, CircuitBreakerClient.FailurePolicy failurePolicy) {
+<span class="nc" id="L195">            this.enableCircuitBreaker = true;</span>
+<span class="nc" id="L196">            this.failureThreshold = failureThreshold;</span>
+<span class="nc" id="L197">            this.resetTimeoutMs = resetTimeoutMs;</span>
+<span class="nc" id="L198">            this.failureDecayTimeMs = failureDecayTimeMs;</span>
+<span class="nc" id="L199">            this.failurePolicy = failurePolicy;</span>
+<span class="nc" id="L200">            return this;</span>
+        }
+
+        /**
+         * Sets a custom failure predicate for the circuit breaker.
+         *
+         * @param failurePredicate Custom predicate to determine what counts as a failure
+         * @return this builder instance
+         */
+        public Builder withFailurePredicate(Predicate&lt;RocketRestException&gt; failurePredicate) {
+<span class="nc" id="L210">            this.failurePredicate = failurePredicate;</span>
+<span class="nc" id="L211">            return this;</span>
+        }
+
+        /**
+         * Adds a custom decorator function that will be applied to the client.
+         *
+         * @param decorator Function that takes a client and returns a decorated client
+         * @return this builder instance
+         */
+        public Builder withCustomDecorator(UnaryOperator&lt;RocketClient&gt; decorator) {
+<span class="nc" id="L221">            this.customDecorator = decorator;</span>
+<span class="nc" id="L222">            return this;</span>
+        }
+
+        /**
+         * Adds an interceptor to the client.
+         *
+         * &lt;p&gt;Interceptors are applied in order based on their {@link RequestInterceptor#getOrder()}.
+         * Lower order values run first for requests and last for responses.
+         *
+         * @param interceptor The interceptor to add
+         * @return this builder instance
+         * @see RequestInterceptor
+         */
+        public Builder withInterceptor(RequestInterceptor interceptor) {
+<span class="nc bnc" id="L236" title="All 2 branches missed.">            if (interceptor != null) {</span>
+<span class="nc" id="L237">                this.interceptors.add(interceptor);</span>
+            }
+<span class="nc" id="L239">            return this;</span>
+        }
+
+        /**
+         * Adds retry capability with default settings.
+         *
+         * &lt;p&gt;Uses 3 retries with 1 second initial delay, 2x exponential backoff,
+         * and 30 second maximum delay.
+         *
+         * @return this builder instance
+         */
+        public Builder withRetry() {
+<span class="nc" id="L251">            return withInterceptor(new RetryInterceptor());</span>
+        }
+
+        /**
+         * Adds retry capability with custom retry count and delay.
+         *
+         * @param maxRetries Maximum number of retries
+         * @param initialDelayMs Initial delay between retries in milliseconds
+         * @return this builder instance
+         */
+        public Builder withRetry(int maxRetries, long initialDelayMs) {
+<span class="nc" id="L262">            return withInterceptor(new RetryInterceptor(maxRetries, initialDelayMs));</span>
+        }
+
+        /**
+         * Adds retry capability with exponential backoff.
+         *
+         * @param maxRetries Maximum number of retries
+         * @param initialDelayMs Initial delay in milliseconds
+         * @param backoffMultiplier Multiplier for each retry (e.g., 2.0 doubles delay)
+         * @return this builder instance
+         */
+        public Builder withRetry(int maxRetries, long initialDelayMs, double backoffMultiplier) {
+<span class="nc" id="L274">            return withInterceptor(new RetryInterceptor(maxRetries, initialDelayMs, backoffMultiplier));</span>
+        }
+
+        /**
+         * Sets the maximum number of retries allowed by the interceptor chain.
+         *
+         * &lt;p&gt;This is a global limit that applies across all retry interceptors.
+         * Default is 3.
+         *
+         * @param maxRetries Maximum retries for the interceptor chain
+         * @return this builder instance
+         */
+        public Builder withMaxRetries(int maxRetries) {
+<span class="nc" id="L287">            this.interceptorMaxRetries = maxRetries;</span>
+<span class="nc" id="L288">            return this;</span>
+        }
+
+        /**
+         * Builds a synchronous RocketClient with the configured settings.
+         *
+         * @return A new RocketClient instance
+         */
+        public RocketClient build() {
+            // First check if there's a custom client provider for testing
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">            if (clientProvider != null) {</span>
+<span class="nc" id="L299">                RocketRestConfig config = new RocketRestConfig.Builder(baseUrl)</span>
+<span class="nc" id="L300">                    .defaultOptions(o -&gt; {</span>
+<span class="nc bnc" id="L301" title="All 2 branches missed.">                        for (String key : options.getKeys()) {</span>
+<span class="nc" id="L302">                            o.set(key, options.getRaw(key));</span>
+<span class="nc" id="L303">                        }</span>
+<span class="nc" id="L304">                    })</span>
+<span class="nc" id="L305">                    .build();</span>
+<span class="nc" id="L306">                return (RocketClient) clientProvider.apply(config);</span>
+            }
+            // Check if the options have circuit breaker enabled
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">            boolean circuitBreakerEnabled = this.enableCircuitBreaker || </span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">                    options.getBoolean(HttpConstants.CircuitBreaker.CIRCUIT_BREAKER_ENABLED, false);</span>
+            // Create base client
+<span class="fc" id="L312">            RocketClient client = new DefaultHttpClient(baseUrl, options);</span>
+            
+            // Apply circuit breaker if enabled in builder or options
+<span class="fc bfc" id="L315" title="All 2 branches covered.">            if (circuitBreakerEnabled) {</span>
+                // Get circuit breaker settings from options if not specified in builder
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">                int threshold = this.enableCircuitBreaker ? </span>
+<span class="nc" id="L318">                        this.failureThreshold : </span>
+<span class="fc" id="L319">                        options.getInt(HttpConstants.CircuitBreaker.CIRCUIT_BREAKER_FAILURE_THRESHOLD, </span>
+                                HttpConstants.CircuitBreaker.DEFAULT_FAILURE_THRESHOLD);
+                // 
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">                long timeout = this.enableCircuitBreaker ? </span>
+<span class="nc" id="L323">                        this.resetTimeoutMs : </span>
+<span class="fc" id="L324">                        options.getLong(HttpConstants.CircuitBreaker.CIRCUIT_BREAKER_RESET_TIMEOUT_MS, </span>
+                                HttpConstants.CircuitBreaker.DEFAULT_RESET_TIMEOUT_MS);
+                // Determine failure policy
+<span class="fc" id="L327">                CircuitBreakerClient.FailurePolicy policy = this.failurePolicy;</span>
+<span class="pc bpc" id="L328" title="2 of 4 branches missed.">                if (!this.enableCircuitBreaker &amp;&amp; options.contains(HttpConstants.CircuitBreaker.CIRCUIT_BREAKER_FAILURE_POLICY)) {</span>
+<span class="fc" id="L329">                    String policyStr = options.getString(HttpConstants.CircuitBreaker.CIRCUIT_BREAKER_FAILURE_POLICY, null);</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">                    if (HttpConstants.CircuitBreaker.CIRCUIT_BREAKER_POLICY_SERVER_ONLY.equals(policyStr)) {</span>
+<span class="fc" id="L331">                        policy = CircuitBreakerClient.FailurePolicy.SERVER_ERRORS_ONLY;</span>
+                    }
+                }
+                // Apply circuit breaker
+<span class="fc" id="L335">                client = new CircuitBreakerClient(</span>
+                        client,
+                        threshold,
+                        timeout,
+                        this.failureDecayTimeMs,
+                        policy,
+                        this.failurePredicate
+                );
+            }
+            // Apply interceptors if any are configured
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">            if (!interceptors.isEmpty()) {</span>
+<span class="nc" id="L346">                client = new InterceptingClient(client, interceptors, interceptorMaxRetries);</span>
+            }
+
+            // Apply any custom decorator
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">            if (customDecorator != null) {</span>
+<span class="nc" id="L351">                client = customDecorator.apply(client);</span>
+            }
+            // Return the client
+<span class="fc" id="L354">            return client;</span>
+        }
+
+        /**
+         * Builds a fluent HTTP client with the configured settings.
+         * This client uses the Result pattern instead of exceptions.
+         *
+         * @return A new FluentHttpClient instance
+         */
+        public FluentHttpClient buildFluent() {
+<span class="fc" id="L364">            RocketClient client = build();</span>
+<span class="fc" id="L365">            return new FluentHttpClient(client, baseUrl, options);</span>
+        }
+
+        /**
+         * Builds an asynchronous RocketClient with the configured settings.
+         *
+         * @return A new AsyncHttpClient instance
+         * @throws IllegalStateException if no executor service was provided
+         */
+        public AsyncHttpClient buildAsync() {
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">            if (executorService == null) {</span>
+<span class="nc" id="L376">                throw new IllegalStateException(&quot;ExecutorService must be provided for async client&quot;);</span>
+            }
+
+<span class="fc" id="L379">            RocketClient client = build();</span>
+<span class="fc" id="L380">            return new AsyncHttpClient(client, executorService);</span>
+        }
+    }
+
+    /**
+     * Creates a builder for constructing RocketClient instances.
+     *
+     * @param baseUrl The base URL for the client
+     * @return A new builder instance
+     */
+    public static Builder builder(String baseUrl) {
+<span class="fc" id="L391">        return new Builder(baseUrl);</span>
+    }
+
+    /**
+     * Creates a builder from an existing RocketRestConfig.
+     *
+     * @param config The RocketRestConfig to use
+     * @return A new builder instance pre-configured with settings from the config
+     */
+    public static Builder fromConfig(RocketRestConfig config) {
+<span class="fc" id="L401">        return builder(config.getServiceUrl())</span>
+<span class="fc" id="L402">                .withOptions(config.getDefaultOptions());</span>
+    }
+
+    /**
+     * Creates a default HTTP client with the given config.
+     *
+     * @param config The RocketRestConfig to use
+     * @return A new DefaultHttpClient instance
+     */
+    public static RocketClient createDefaultClient(RocketRestConfig config) {
+<span class="nc" id="L412">        return builder(config.getServiceUrl())</span>
+<span class="nc" id="L413">                .withOptions(config.getDefaultOptions())</span>
+<span class="nc" id="L414">                .build();</span>
+    }
+
+    /**
+     * Creates a fluent HTTP client with the given config.
+     * This client uses the Result pattern instead of exceptions.
+     *
+     * @param config The RocketRestConfig to use
+     * @return A new FluentHttpClient instance
+     */
+    public static FluentHttpClient createFluentClient(RocketRestConfig config) {
+<span class="nc" id="L425">        return new FluentHttpClient(config.getServiceUrl(), config.getDefaultOptions());</span>
+    }
+
+    /**
+     * Creates a fluent HTTP client with the given base URL.
+     * This client uses the Result pattern instead of exceptions.
+     *
+     * @param baseUrl The base URL for the client
+     * @return A new FluentHttpClient instance
+     */
+    public static FluentHttpClient createFluentClient(String baseUrl) {
+<span class="nc" id="L436">        return new FluentHttpClient(baseUrl);</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

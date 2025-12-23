@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RocketRestConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr</a> &gt; <span class="el_source">RocketRestConfig.java</span></div><h1>RocketRestConfig.java</h1><pre class="source lang-java linenums">package com.guinetik.rr;
+
+import com.guinetik.rr.auth.AuthStrategy;
+import com.guinetik.rr.auth.AuthStrategyFactory;
+
+import java.util.function.Consumer;
+
+/**
+ * Configuration container for {@link RocketRest} clients.
+ *
+ * &lt;p&gt;This class holds all configuration options needed to create a RocketRest client,
+ * including the service URL, authentication strategy, and default request options.
+ * Use the fluent {@link Builder} to construct instances.
+ *
+ * &lt;h2&gt;Basic Usage&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketRestConfig config = RocketRestConfig.builder(&quot;https://api.example.com&quot;)
+ *     .build();
+ *
+ * RocketRest client = new RocketRest(config);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;With Authentication&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketRestConfig config = RocketRestConfig.builder(&quot;https://api.example.com&quot;)
+ *     .authStrategy(AuthStrategyFactory.createBearerToken(&quot;my-api-token&quot;))
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;With Default Options&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketRestConfig config = RocketRestConfig.builder(&quot;https://api.example.com&quot;)
+ *     .authStrategy(AuthStrategyFactory.createBasicAuth(&quot;user&quot;, &quot;pass&quot;))
+ *     .defaultOptions(options -&amp;gt; {
+ *         options.set(RocketRestOptions.RETRY_ENABLED, true);
+ *         options.set(RocketRestOptions.MAX_RETRIES, 3);
+ *         options.set(RocketRestOptions.CONNECT_TIMEOUT, 5000);
+ *         options.set(RocketRestOptions.LOG_REQUEST_BODY, true);
+ *     })
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;OAuth2 Client Credentials&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketRestConfig config = RocketRestConfig.builder(&quot;https://api.example.com&quot;)
+ *     .tokenUrl(&quot;https://auth.example.com/oauth/token&quot;)
+ *     .authStrategy(AuthStrategyFactory.createOAuth2ClientCredentials(
+ *         &quot;https://auth.example.com/oauth/token&quot;,
+ *         &quot;client-id&quot;,
+ *         &quot;client-secret&quot;
+ *     ))
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see RocketRest
+ * @see RocketRestOptions
+ * @see com.guinetik.rr.auth.AuthStrategy
+ * @since 1.0.0
+ */
+public class RocketRestConfig {
+
+    /**
+     * Builder for creating RocketRestConfig instances.
+     */
+    public static class Builder {
+        private final String serviceUrl;
+<span class="fc" id="L68">        private final RocketRestOptions defaultOptions = new RocketRestOptions();</span>
+        private String tokenUrl;
+<span class="fc" id="L70">        private AuthStrategy authStrategy = AuthStrategyFactory.createNoAuth();</span>
+
+<span class="fc" id="L72">        public Builder(String serviceUrl) {</span>
+<span class="fc" id="L73">            this.serviceUrl = serviceUrl;</span>
+<span class="fc" id="L74">        }</span>
+
+        /**
+         * Sets the token URL for OAuth flows.
+         *
+         * @param tokenUrl the token URL
+         * @return this builder instance
+         */
+        public Builder tokenUrl(String tokenUrl) {
+<span class="nc" id="L83">            this.tokenUrl = tokenUrl;</span>
+<span class="nc" id="L84">            return this;</span>
+        }
+
+        /**
+         * Sets the authentication strategy.
+         *
+         * @param authStrategy the authentication strategy
+         * @return this builder instance
+         */
+        public Builder authStrategy(AuthStrategy authStrategy) {
+<span class="nc" id="L94">            this.authStrategy = authStrategy;</span>
+<span class="nc" id="L95">            return this;</span>
+        }
+
+
+        /**
+         * Sets default client options that will be used by clients created with this config.
+         *
+         * @param optionsConfigurer a consumer that configures the default options
+         * @return this builder instance
+         */
+        public Builder defaultOptions(Consumer&lt;RocketRestOptions&gt; optionsConfigurer) {
+<span class="fc" id="L106">            optionsConfigurer.accept(this.defaultOptions);</span>
+<span class="fc" id="L107">            return this;</span>
+        }
+
+        /**
+         * Sets a specific default client option.
+         *
+         * @param key   the option key
+         * @param value the option value
+         * @return this builder instance
+         */
+        public Builder defaultOption(String key, Object value) {
+<span class="fc" id="L118">            this.defaultOptions.set(key, value);</span>
+<span class="fc" id="L119">            return this;</span>
+        }
+
+        /**
+         * Builds a new RocketRestConfig instance.
+         *
+         * @return a new RocketRestConfig instance
+         */
+        public RocketRestConfig build() {
+<span class="fc" id="L128">            return new RocketRestConfig(this);</span>
+        }
+    }
+    private String serviceUrl;
+    private final String tokenUrl;
+    private final AuthStrategy authStrategy;
+    // Default client options
+    private final RocketRestOptions defaultOptions;
+
+<span class="fc" id="L137">    protected RocketRestConfig(Builder builder) {</span>
+<span class="fc" id="L138">        this.serviceUrl = builder.serviceUrl;</span>
+<span class="fc" id="L139">        this.tokenUrl = builder.tokenUrl;</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        this.authStrategy = builder.authStrategy != null ? builder.authStrategy : AuthStrategyFactory.createNoAuth();</span>
+<span class="fc" id="L141">        this.defaultOptions = builder.defaultOptions;</span>
+<span class="fc" id="L142">    }</span>
+
+    /**
+     * Gets the service URL.
+     *
+     * @return the service URL
+     */
+    public String getServiceUrl() {
+<span class="fc" id="L150">        return serviceUrl;</span>
+    }
+
+    /**
+     * Gets the token URL for OAuth flows.
+     *
+     * @return the token URL
+     */
+    public String getTokenUrl() {
+<span class="nc" id="L159">        return tokenUrl;</span>
+    }
+
+    /**
+     * Gets the authentication strategy.
+     *
+     * @return the authentication strategy
+     */
+    public AuthStrategy getAuthStrategy() {
+<span class="fc" id="L168">        return authStrategy;</span>
+    }
+
+    /**
+     * Gets the default client options for clients created with this config.
+     *
+     * @return the default client options
+     */
+    public RocketRestOptions getDefaultOptions() {
+<span class="fc" id="L177">        return defaultOptions;</span>
+    }
+
+    public void setServiceUrl(String baseUrl) {
+<span class="fc" id="L181">        this.serviceUrl = baseUrl;</span>
+<span class="fc" id="L182">    }</span>
+
+    /**
+     * Creates a new builder for RocketRestConfig.
+     *
+     * @param serviceUrl the base URL for the API service
+     * @return a new builder instance
+     */
+    public static Builder builder(String serviceUrl) {
+<span class="fc" id="L191">        return new Builder(serviceUrl);</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,634 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RocketRest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr</a> &gt; <span class="el_source">RocketRest.java</span></div><h1>RocketRest.java</h1><pre class="source lang-java linenums">package com.guinetik.rr;
+
+import com.guinetik.rr.api.AsyncApiClient;
+import com.guinetik.rr.api.DefaultApiClient;
+import com.guinetik.rr.api.FluentApiClient;
+import com.guinetik.rr.auth.AbstractOAuth2Strategy;
+import com.guinetik.rr.request.RequestBuilder;
+import com.guinetik.rr.request.RequestSpec;
+import com.guinetik.rr.result.ApiError;
+import com.guinetik.rr.result.Result;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Date;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * Main entry point for interacting with REST APIs using RocketRest.
+ *
+ * &lt;p&gt;This class provides a unified facade for making HTTP requests with three different API styles:
+ * &lt;ul&gt;
+ *   &lt;li&gt;&lt;b&gt;Synchronous API&lt;/b&gt; - Traditional blocking calls via {@link #sync()}&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Asynchronous API&lt;/b&gt; - Non-blocking calls with {@link CompletableFuture} via {@link #async()}&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Fluent API&lt;/b&gt; - Functional error handling with {@link Result} pattern via {@link #fluent()}&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;h2&gt;Quick Start&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Create a client with simple URL
+ * RocketRest client = new RocketRest(&quot;https://api.example.com&quot;);
+ *
+ * // Make a GET request
+ * User user = client.get(&quot;/users/1&quot;, User.class);
+ *
+ * // Don't forget to shutdown when done
+ * client.shutdown();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Using Different API Styles&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Synchronous API - blocks until response
+ * Todo todo = client.sync().get(&quot;/todos/1&quot;, Todo.class);
+ *
+ * // Asynchronous API - returns CompletableFuture
+ * CompletableFuture&amp;lt;Todo&amp;gt; future = client.async().get(&quot;/todos/1&quot;, Todo.class);
+ * future.thenAccept(t -&amp;gt; System.out.println(t.getTitle()));
+ *
+ * // Fluent API with Result pattern - no exceptions
+ * Result&amp;lt;Todo, ApiError&amp;gt; result = client.fluent().get(&quot;/todos/1&quot;, Todo.class);
+ * result.match(
+ *     todo -&amp;gt; System.out.println(&quot;Success: &quot; + todo.getTitle()),
+ *     error -&amp;gt; System.err.println(&quot;Error: &quot; + error.getMessage())
+ * );
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Configuration&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketRestConfig config = RocketRestConfig.builder(&quot;https://api.example.com&quot;)
+ *     .authStrategy(AuthStrategyFactory.createBearerToken(&quot;my-token&quot;))
+ *     .defaultOptions(opts -&amp;gt; {
+ *         opts.set(RocketRestOptions.RETRY_ENABLED, true);
+ *         opts.set(RocketRestOptions.MAX_RETRIES, 3);
+ *     })
+ *     .build();
+ *
+ * RocketRest client = new RocketRest(config);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see RocketRestConfig
+ * @see Result
+ * @since 1.0.0
+ */
+public class RocketRest {
+
+<span class="fc" id="L79">    protected final Logger logger = LoggerFactory.getLogger(this.getClass());</span>
+
+    private final RocketRestOptions options;
+    private final DefaultApiClient syncClient;
+    private final AsyncApiClient asyncClient;
+    private final FluentApiClient fluentClient;
+    
+    /**
+     * Interface for synchronous API operations.
+     */
+    public interface SyncApi {
+        &lt;T&gt; T get(String endpoint, Class&lt;T&gt; responseType);
+        &lt;T&gt; T get(String endpoint, Class&lt;T&gt; responseType, Map&lt;String, String&gt; queryParams);
+        &lt;Res&gt; Res post(String endpoint, Class&lt;Res&gt; responseType);
+        &lt;Req, Res&gt; Res post(String endpoint, Req body, Class&lt;Res&gt; responseType);
+        &lt;Res&gt; Res put(String endpoint, Class&lt;Res&gt; responseType);
+        &lt;Req, Res&gt; Res put(String endpoint, Req body, Class&lt;Res&gt; responseType);
+        &lt;T&gt; T delete(String endpoint, Class&lt;T&gt; responseType);
+        &lt;Req, Res&gt; Res execute(RequestSpec&lt;Req, Res&gt; requestSpec);
+    }
+
+    /**
+     * Interface for asynchronous API operations.
+     */
+    public interface AsyncApi {
+        &lt;T&gt; CompletableFuture&lt;T&gt; get(String endpoint, Class&lt;T&gt; responseType);
+        &lt;T&gt; CompletableFuture&lt;T&gt; get(String endpoint, Class&lt;T&gt; responseType, Map&lt;String, String&gt; queryParams);
+        &lt;Res&gt; CompletableFuture&lt;Res&gt; post(String endpoint, Class&lt;Res&gt; responseType);
+        &lt;Req, Res&gt; CompletableFuture&lt;Res&gt; post(String endpoint, Req body, Class&lt;Res&gt; responseType);
+        &lt;Res&gt; CompletableFuture&lt;Res&gt; put(String endpoint, Class&lt;Res&gt; responseType);
+        &lt;Req, Res&gt; CompletableFuture&lt;Res&gt; put(String endpoint, Req body, Class&lt;Res&gt; responseType);
+        &lt;T&gt; CompletableFuture&lt;T&gt; delete(String endpoint, Class&lt;T&gt; responseType);
+        &lt;Req, Res&gt; CompletableFuture&lt;Res&gt; execute(RequestSpec&lt;Req, Res&gt; requestSpec);
+        void shutdown();
+    }
+
+    /**
+     * Interface for fluent API operations with a Result pattern.
+     */
+    public interface FluentApi {
+        &lt;T&gt; Result&lt;T, ApiError&gt; get(String endpoint, Class&lt;T&gt; responseType);
+        &lt;T&gt; Result&lt;T, ApiError&gt; get(String endpoint, Class&lt;T&gt; responseType, Map&lt;String, String&gt; queryParams);
+        &lt;Res&gt; Result&lt;Res, ApiError&gt; post(String endpoint, Class&lt;Res&gt; responseType);
+        &lt;Req, Res&gt; Result&lt;Res, ApiError&gt; post(String endpoint, Req body, Class&lt;Res&gt; responseType);
+        &lt;Res&gt; Result&lt;Res, ApiError&gt; put(String endpoint, Class&lt;Res&gt; responseType);
+        &lt;Req, Res&gt; Result&lt;Res, ApiError&gt; put(String endpoint, Req body, Class&lt;Res&gt; responseType);
+        &lt;T&gt; Result&lt;T, ApiError&gt; delete(String endpoint, Class&lt;T&gt; responseType);
+        &lt;Req, Res&gt; Result&lt;Res, ApiError&gt; execute(RequestSpec&lt;Req, Res&gt; requestSpec);
+    }
+
+    private RocketRestConfig config;
+
+    /**
+     * Creates a new {@link RocketRest} instance.
+     *
+     * @param config the configuration for the REST client.
+     */
+    public RocketRest(RocketRestConfig config) {
+<span class="fc" id="L137">        this(config.getServiceUrl(), config);</span>
+<span class="fc" id="L138">    }</span>
+
+    /**
+     * Creates a new {@link RocketRest} instance with a specific base URL.
+     *
+     * @param baseUrl the base URL of the API.
+     * @param config  the configuration for the REST client.
+     */
+<span class="fc" id="L146">    public RocketRest(String baseUrl, RocketRestConfig config) {</span>
+        // Initialize options from config's default options
+<span class="fc" id="L148">        this.config = config;</span>
+<span class="pc bpc" id="L149" title="2 of 4 branches missed.">        if (this.config != null &amp;&amp; this.config.getDefaultOptions() != null) {</span>
+<span class="fc" id="L150">            this.options = new RocketRestOptions();</span>
+<span class="fc" id="L151">            RocketRestOptions defaultOptions = this.config.getDefaultOptions();</span>
+
+            // Copy all default options to this client's options
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            for (String key : defaultOptions.getKeys()) {</span>
+<span class="fc" id="L155">                Object value = defaultOptions.getRaw(key);</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">                if (value != null) {</span>
+<span class="fc" id="L157">                    this.options.set(key, value);</span>
+                }
+<span class="fc" id="L159">            }</span>
+<span class="fc" id="L160">        } else {</span>
+<span class="nc" id="L161">            this.options = new RocketRestOptions();</span>
+        }
+
+        // Initialize clients (they will get default options from config)
+<span class="fc" id="L165">        this.syncClient = new DefaultApiClient(baseUrl, this.config);</span>
+
+        // Get the pool size from options
+<span class="fc" id="L168">        int poolSize = options.getInt(RocketRestOptions.ASYNC_POOL_SIZE, 4);</span>
+<span class="fc" id="L169">        ExecutorService asyncExecutor = Executors.newFixedThreadPool(poolSize);</span>
+<span class="fc" id="L170">        this.asyncClient = new AsyncApiClient(baseUrl, this.config, asyncExecutor);</span>
+        
+        // Initialize the fluent client
+<span class="fc" id="L173">        this.fluentClient = new FluentApiClient(baseUrl, this.config);</span>
+
+<span class="fc" id="L175">        logger.info(&quot;Initialized RocketRest with base URL: {} and async pool size: {}&quot;, baseUrl, poolSize);</span>
+<span class="fc" id="L176">    }</span>
+
+    /**
+     * Performs a synchronous GET request to the specified endpoint.
+     *
+     * @param &lt;T&gt; The response type
+     * @param endpoint The API endpoint
+     * @param responseType The class of the response type
+     * @return The response object
+     */
+    public &lt;T&gt; T get(String endpoint, Class&lt;T&gt; responseType) {
+<span class="fc" id="L187">        return sync().get(endpoint, responseType);</span>
+    }
+
+    /**
+     * Performs a synchronous GET request with query parameters.
+     *
+     * @param &lt;T&gt; The response type
+     * @param endpoint The API endpoint
+     * @param responseType The class of the response type
+     * @param queryParams The query parameters
+     * @return The response object
+     */
+    public &lt;T&gt; T get(String endpoint, Class&lt;T&gt; responseType, Map&lt;String, String&gt; queryParams) {
+<span class="nc" id="L200">        return sync().get(endpoint, responseType, queryParams);</span>
+    }
+
+    /**
+     * Performs a synchronous POST request.
+     *
+     * @param &lt;Res&gt; The response type
+     * @param endpoint The API endpoint
+     * @param responseType The class of the response type
+     * @return The response object
+     */
+    public &lt;Res&gt; Res post(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="fc" id="L212">        return sync().post(endpoint, responseType);</span>
+    }
+
+    /**
+     * Performs a synchronous POST request with a body.
+     *
+     * @param &lt;Req&gt; The request body type
+     * @param &lt;Res&gt; The response type
+     * @param endpoint The API endpoint
+     * @param body The request body
+     * @param responseType The class of the response type
+     * @return The response object
+     */
+    public &lt;Req, Res&gt; Res post(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L226">        return sync().post(endpoint, body, responseType);</span>
+    }
+
+    /**
+     * Performs a synchronous PUT request.
+     *
+     * @param &lt;Res&gt; The response type
+     * @param endpoint The API endpoint
+     * @param responseType The class of the response type
+     * @return The response object
+     */
+    public &lt;Res&gt; Res put(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L238">        return sync().put(endpoint, responseType);</span>
+    }
+
+    /**
+     * Performs a synchronous PUT request with a body.
+     *
+     * @param &lt;Req&gt; The request body type
+     * @param &lt;Res&gt; The response type
+     * @param endpoint The API endpoint
+     * @param body The request body
+     * @param responseType The class of the response type
+     * @return The response object
+     */
+    public &lt;Req, Res&gt; Res put(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L252">        return sync().put(endpoint, body, responseType);</span>
+    }
+
+    /**
+     * Performs a synchronous DELETE request.
+     *
+     * @param &lt;T&gt; The response type
+     * @param endpoint The API endpoint
+     * @param responseType The class of the response type
+     * @return The response object
+     */
+    public &lt;T&gt; T delete(String endpoint, Class&lt;T&gt; responseType) {
+<span class="nc" id="L264">        return sync().delete(endpoint, responseType);</span>
+    }
+
+    /**
+     * Executes a synchronous request with the given request specification.
+     *
+     * @param &lt;Req&gt; The request body type
+     * @param &lt;Res&gt; The response type
+     * @param requestSpec The request specification
+     * @return The response object
+     */
+    public &lt;Req, Res&gt; Res execute(RequestSpec&lt;Req, Res&gt; requestSpec) {
+<span class="nc" id="L276">        return sync().execute(requestSpec);</span>
+    }
+
+    /**
+     * Gets the synchronous API interface.
+     * 
+     * @return The synchronous API interface
+     */
+    public SyncApi sync() {
+<span class="fc" id="L285">        return new SyncApiImpl();</span>
+    }
+    
+    /**
+     * Gets the asynchronous API interface.
+     * 
+     * @return The asynchronous API interface
+     */
+    public AsyncApi async() {
+<span class="fc" id="L294">        return new AsyncApiImpl();</span>
+    }
+    
+    /**
+     * Gets the fluent API interface with Result pattern.
+     * 
+     * @return The fluent API interface
+     */
+    public FluentApi fluent() {
+<span class="fc" id="L303">        return new FluentApiImpl();</span>
+    }
+
+    /**
+     * Configures a client option with the specified value.
+     *
+     * @param key   The option key from ClientOptions.
+     * @param value The option value.
+     * @return this client instance for method chaining
+     */
+    public RocketRest configure(String key, Object value) {
+<span class="fc" id="L314">        options.set(key, value);</span>
+
+        // Apply to all clients
+<span class="fc" id="L317">        syncClient.configure(key, value);</span>
+<span class="fc" id="L318">        asyncClient.configure(key, value);</span>
+<span class="fc" id="L319">        fluentClient.configure(key, value);</span>
+
+        // Special handling for async pool size
+<span class="pc bpc" id="L322" title="1 of 4 branches missed.">        if (RocketRestOptions.ASYNC_POOL_SIZE.equals(key) &amp;&amp; value instanceof Integer) {</span>
+<span class="fc" id="L323">            logger.info(&quot;Note: Changing ASYNC_POOL_SIZE after initialization is not supported&quot;);</span>
+        }
+
+<span class="fc" id="L326">        return this;</span>
+    }
+
+    /**
+     * Shuts down all resources used by this client.
+     */
+    public void shutdown() {
+<span class="fc" id="L333">        asyncClient.shutdown();</span>
+<span class="fc" id="L334">        logger.info(&quot;RocketRest shutdown completed.&quot;);</span>
+<span class="fc" id="L335">    }</span>
+    
+    // Helper methods for building request specs
+    
+    /**
+     * Creates a GET request specification.
+     *
+     * @param &lt;T&gt;          The response type
+     * @param endpoint     The API endpoint
+     * @param responseType The class of the response type
+     * @return A built request specification
+     */
+    private &lt;T&gt; RequestSpec&lt;Void, T&gt; createGetRequest(String endpoint, Class&lt;T&gt; responseType) {
+<span class="fc" id="L348">        logger.debug(&quot;Creating GET request to endpoint: {}&quot;, endpoint);</span>
+<span class="fc" id="L349">        return new RequestBuilder&lt;Void, T&gt;()</span>
+<span class="fc" id="L350">                .endpoint(endpoint)</span>
+<span class="fc" id="L351">                .method(&quot;GET&quot;)</span>
+<span class="fc" id="L352">                .responseType(responseType)</span>
+<span class="fc" id="L353">                .build();</span>
+    }
+    
+    /**
+     * Creates a GET request specification with query parameters.
+     *
+     * @param &lt;T&gt;          The response type
+     * @param endpoint     The API endpoint
+     * @param responseType The class of the response type
+     * @param queryParams  The query parameters
+     * @return A built request specification
+     */
+    private &lt;T&gt; RequestSpec&lt;Void, T&gt; createGetRequest(String endpoint, Class&lt;T&gt; responseType, Map&lt;String, String&gt; queryParams) {
+<span class="fc" id="L366">        logger.debug(&quot;Creating GET request to endpoint: {} with params: {}&quot;, endpoint, queryParams);</span>
+<span class="fc" id="L367">        return new RequestBuilder&lt;Void, T&gt;()</span>
+<span class="fc" id="L368">                .endpoint(endpoint)</span>
+<span class="fc" id="L369">                .method(&quot;GET&quot;)</span>
+<span class="fc" id="L370">                .queryParams(queryParams)</span>
+<span class="fc" id="L371">                .responseType(responseType)</span>
+<span class="fc" id="L372">                .build();</span>
+    }
+    
+    /**
+     * Creates a POST request specification.
+     *
+     * @param &lt;Res&gt;        The response type
+     * @param endpoint     The API endpoint
+     * @param responseType The class of the response type
+     * @return A built request specification
+     */
+    private &lt;Res&gt; RequestSpec&lt;Void, Res&gt; createPostRequest(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="fc" id="L384">        logger.debug(&quot;Creating POST request to endpoint: {}&quot;, endpoint);</span>
+<span class="fc" id="L385">        return new RequestBuilder&lt;Void, Res&gt;()</span>
+<span class="fc" id="L386">                .endpoint(endpoint)</span>
+<span class="fc" id="L387">                .method(&quot;POST&quot;)</span>
+<span class="fc" id="L388">                .responseType(responseType)</span>
+<span class="fc" id="L389">                .build();</span>
+    }
+    
+    /**
+     * Creates a POST request specification with a body.
+     *
+     * @param &lt;Req&gt;        The request body type
+     * @param &lt;Res&gt;        The response type
+     * @param endpoint     The API endpoint
+     * @param body         The request body
+     * @param responseType The class of the response type
+     * @return A built request specification
+     */
+    private &lt;Req, Res&gt; RequestSpec&lt;Req, Res&gt; createPostRequest(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="fc" id="L403">        logger.debug(&quot;Creating POST request to endpoint: {} with body&quot;, endpoint);</span>
+<span class="fc" id="L404">        return new RequestBuilder&lt;Req, Res&gt;()</span>
+<span class="fc" id="L405">                .endpoint(endpoint)</span>
+<span class="fc" id="L406">                .method(&quot;POST&quot;)</span>
+<span class="fc" id="L407">                .body(body)</span>
+<span class="fc" id="L408">                .responseType(responseType)</span>
+<span class="fc" id="L409">                .build();</span>
+    }
+    
+    /**
+     * Creates a PUT request specification.
+     *
+     * @param &lt;Res&gt;        The response type
+     * @param endpoint     The API endpoint
+     * @param responseType The class of the response type
+     * @return A built request specification
+     */
+    private &lt;Res&gt; RequestSpec&lt;Void, Res&gt; createPutRequest(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="fc" id="L421">        logger.debug(&quot;Creating PUT request to endpoint: {}&quot;, endpoint);</span>
+<span class="fc" id="L422">        return new RequestBuilder&lt;Void, Res&gt;()</span>
+<span class="fc" id="L423">                .endpoint(endpoint)</span>
+<span class="fc" id="L424">                .method(&quot;PUT&quot;)</span>
+<span class="fc" id="L425">                .responseType(responseType)</span>
+<span class="fc" id="L426">                .build();</span>
+    }
+    
+    /**
+     * Creates a PUT request specification with a body.
+     *
+     * @param &lt;Req&gt;        The request body type
+     * @param &lt;Res&gt;        The response type
+     * @param endpoint     The API endpoint
+     * @param body         The request body
+     * @param responseType The class of the response type
+     * @return A built request specification
+     */
+    private &lt;Req, Res&gt; RequestSpec&lt;Req, Res&gt; createPutRequest(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="fc" id="L440">        logger.debug(&quot;Creating PUT request to endpoint: {} with body&quot;, endpoint);</span>
+<span class="fc" id="L441">        return new RequestBuilder&lt;Req, Res&gt;()</span>
+<span class="fc" id="L442">                .endpoint(endpoint)</span>
+<span class="fc" id="L443">                .method(&quot;PUT&quot;)</span>
+<span class="fc" id="L444">                .body(body)</span>
+<span class="fc" id="L445">                .responseType(responseType)</span>
+<span class="fc" id="L446">                .build();</span>
+    }
+    
+    /**
+     * Creates a DELETE request specification.
+     *
+     * @param &lt;T&gt;          The response type
+     * @param endpoint     The API endpoint
+     * @param responseType The class of the response type
+     * @return A built request specification
+     */
+    private &lt;T&gt; RequestSpec&lt;Void, T&gt; createDeleteRequest(String endpoint, Class&lt;T&gt; responseType) {
+<span class="fc" id="L458">        logger.debug(&quot;Creating DELETE request to endpoint: {}&quot;, endpoint);</span>
+<span class="fc" id="L459">        return new RequestBuilder&lt;Void, T&gt;()</span>
+<span class="fc" id="L460">                .endpoint(endpoint)</span>
+<span class="fc" id="L461">                .method(&quot;DELETE&quot;)</span>
+<span class="fc" id="L462">                .responseType(responseType)</span>
+<span class="fc" id="L463">                .build();</span>
+    }
+    
+    // Inner class implementations of the API interfaces
+    
+    /**
+     * Implementation of SyncApi that delegates to the underlying DefaultApiClient.
+     */
+<span class="fc" id="L471">    private class SyncApiImpl implements SyncApi {</span>
+        @Override
+        public &lt;T&gt; T get(String endpoint, Class&lt;T&gt; responseType) {
+<span class="fc" id="L474">            return syncClient.execute(createGetRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;T&gt; T get(String endpoint, Class&lt;T&gt; responseType, Map&lt;String, String&gt; queryParams) {
+<span class="nc" id="L479">            return syncClient.execute(createGetRequest(endpoint, responseType, queryParams));</span>
+        }
+        
+        @Override
+        public &lt;Res&gt; Res post(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L484">            return syncClient.execute(createPostRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; Res post(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="fc" id="L489">            return syncClient.execute(createPostRequest(endpoint, body, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Res&gt; Res put(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L494">            return syncClient.execute(createPutRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; Res put(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="fc" id="L499">            return syncClient.execute(createPutRequest(endpoint, body, responseType));</span>
+        }
+        
+        @Override
+        public &lt;T&gt; T delete(String endpoint, Class&lt;T&gt; responseType) {
+<span class="fc" id="L504">            return syncClient.execute(createDeleteRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; Res execute(RequestSpec&lt;Req, Res&gt; requestSpec) {
+<span class="nc" id="L509">            return syncClient.execute(requestSpec);</span>
+        }
+    }
+    
+    /**
+     * Implementation of AsyncApi that delegates to the underlying AsyncApiClient.
+     */
+<span class="fc" id="L516">    private class AsyncApiImpl implements AsyncApi {</span>
+        @Override
+        public &lt;T&gt; CompletableFuture&lt;T&gt; get(String endpoint, Class&lt;T&gt; responseType) {
+<span class="fc" id="L519">            return asyncClient.executeAsync(createGetRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;T&gt; CompletableFuture&lt;T&gt; get(String endpoint, Class&lt;T&gt; responseType, Map&lt;String, String&gt; queryParams) {
+<span class="fc" id="L524">            return asyncClient.executeAsync(createGetRequest(endpoint, responseType, queryParams));</span>
+        }
+        
+        @Override
+        public &lt;Res&gt; CompletableFuture&lt;Res&gt; post(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="fc" id="L529">            return asyncClient.executeAsync(createPostRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; CompletableFuture&lt;Res&gt; post(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="fc" id="L534">            return asyncClient.executeAsync(createPostRequest(endpoint, body, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Res&gt; CompletableFuture&lt;Res&gt; put(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="fc" id="L539">            return asyncClient.executeAsync(createPutRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; CompletableFuture&lt;Res&gt; put(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="fc" id="L544">            return asyncClient.executeAsync(createPutRequest(endpoint, body, responseType));</span>
+        }
+        
+        @Override
+        public &lt;T&gt; CompletableFuture&lt;T&gt; delete(String endpoint, Class&lt;T&gt; responseType) {
+<span class="fc" id="L549">            return asyncClient.executeAsync(createDeleteRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; CompletableFuture&lt;Res&gt; execute(RequestSpec&lt;Req, Res&gt; requestSpec) {
+<span class="fc" id="L554">            return asyncClient.executeAsync(requestSpec);</span>
+        }
+        
+        @Override
+        public void shutdown() {
+<span class="nc" id="L559">            asyncClient.shutdown();</span>
+<span class="nc" id="L560">        }</span>
+    }
+    
+    /**
+     * Implementation of FluentApi that delegates to the underlying FluentApiClient.
+     */
+<span class="fc" id="L566">    private class FluentApiImpl implements FluentApi {</span>
+        @Override
+        public &lt;T&gt; Result&lt;T, ApiError&gt; get(String endpoint, Class&lt;T&gt; responseType) {
+<span class="fc" id="L569">            return fluentClient.executeWithResult(createGetRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;T&gt; Result&lt;T, ApiError&gt; get(String endpoint, Class&lt;T&gt; responseType, Map&lt;String, String&gt; queryParams) {
+<span class="fc" id="L574">            return fluentClient.executeWithResult(createGetRequest(endpoint, responseType, queryParams));</span>
+        }
+        
+        @Override
+        public &lt;Res&gt; Result&lt;Res, ApiError&gt; post(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="fc" id="L579">            return fluentClient.executeWithResult(createPostRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; Result&lt;Res, ApiError&gt; post(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="fc" id="L584">            return fluentClient.executeWithResult(createPostRequest(endpoint, body, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Res&gt; Result&lt;Res, ApiError&gt; put(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="fc" id="L589">            return fluentClient.executeWithResult(createPutRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; Result&lt;Res, ApiError&gt; put(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="fc" id="L594">            return fluentClient.executeWithResult(createPutRequest(endpoint, body, responseType));</span>
+        }
+        
+        @Override
+        public &lt;T&gt; Result&lt;T, ApiError&gt; delete(String endpoint, Class&lt;T&gt; responseType) {
+<span class="fc" id="L599">            return fluentClient.executeWithResult(createDeleteRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; Result&lt;Res, ApiError&gt; execute(RequestSpec&lt;Req, Res&gt; requestSpec) {
+<span class="fc" id="L604">            return fluentClient.&lt;Req, Res&gt;executeWithResult(requestSpec);</span>
+        }
+    }
+
+    public void setBaseUrl(String baseUrl) {
+<span class="fc" id="L609">        this.syncClient.setBaseUrl(baseUrl);</span>
+<span class="fc" id="L610">        this.asyncClient.setBaseUrl(baseUrl);</span>
+<span class="fc" id="L611">        this.fluentClient.setBaseUrl(baseUrl);</span>
+<span class="fc" id="L612">    }</span>
+
+    public String getAccessToken() {
+<span class="nc bnc" id="L615" title="All 2 branches missed.">        if(this.config.getAuthStrategy() instanceof AbstractOAuth2Strategy) {</span>
+<span class="nc" id="L616">            AbstractOAuth2Strategy strat = (AbstractOAuth2Strategy) this.config.getAuthStrategy();</span>
+<span class="nc" id="L617">            return strat.getAccessToken();</span>
+        }
+<span class="nc" id="L619">        return null;</span>
+    }
+
+    public Date getTokenExpiryTime() {
+<span class="nc bnc" id="L623" title="All 2 branches missed.">        if(this.config.getAuthStrategy() instanceof AbstractOAuth2Strategy) {</span>
+<span class="nc" id="L624">            AbstractOAuth2Strategy strat = (AbstractOAuth2Strategy) this.config.getAuthStrategy();</span>
+<span class="nc" id="L625">            return strat.getTokenExpiryTime();</span>
+        }
+<span class="nc" id="L627">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

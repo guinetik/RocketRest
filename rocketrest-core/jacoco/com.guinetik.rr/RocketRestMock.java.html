@@ -1,0 +1,661 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RocketRestMock.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr</a> &gt; <span class="el_source">RocketRestMock.java</span></div><h1>RocketRestMock.java</h1><pre class="source lang-java linenums">package com.guinetik.rr;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.guinetik.rr.api.ApiException;
+import com.guinetik.rr.http.*;
+import com.guinetik.rr.request.RequestSpec;
+import com.guinetik.rr.result.ApiError;
+import com.guinetik.rr.result.Result;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
+
+/**
+ * Mock implementation of {@link RocketRest} for unit testing without actual HTTP requests.
+ *
+ * &lt;p&gt;This class simulates REST API interactions by returning predefined responses based on
+ * HTTP method and URL patterns. It supports regex matching, simulated network latency,
+ * invocation counting, and circuit breaker testing.
+ *
+ * &lt;h2&gt;Features&lt;/h2&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;Predefined mock responses for any HTTP method and URL pattern&lt;/li&gt;
+ *   &lt;li&gt;Regex-based URL matching for flexible endpoint simulation&lt;/li&gt;
+ *   &lt;li&gt;Simulated network latency for timing-sensitive tests&lt;/li&gt;
+ *   &lt;li&gt;Invocation counting for verification in tests&lt;/li&gt;
+ *   &lt;li&gt;Circuit breaker integration for resilience testing&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;h2&gt;Basic Usage&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Create mock client
+ * RocketRestConfig config = RocketRestConfig.builder(&quot;https://api.example.com&quot;).build();
+ * RocketRestMock mockClient = new RocketRestMock(config);
+ *
+ * // Define mock responses
+ * mockClient.addMockResponse(&quot;GET&quot;, &quot;/users/1&quot;, (url, body) -&amp;gt; {
+ *     User user = new User();
+ *     user.setId(1);
+ *     user.setName(&quot;John Doe&quot;);
+ *     return user;
+ * });
+ *
+ * // Use in tests
+ * User user = mockClient.get(&quot;/users/1&quot;, User.class);
+ * assertEquals(&quot;John Doe&quot;, user.getName());
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Regex URL Matching&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;{@code
+ * // Match any user ID (use regex pattern like /users/[0-9]+)
+ * mockClient.addMockResponse(&quot;GET&quot;, &quot;/users/[0-9]+&quot;, (url, body) -&gt; {
+ *     // Extract ID from URL and return corresponding user
+ *     String id = url.substring(url.lastIndexOf('/') + 1);
+ *     User user = new User();
+ *     user.setId(Integer.parseInt(id));
+ *     return user;
+ * }, true);  // true enables regex matching
+ * }&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Simulating Latency&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Add 500ms latency for slow endpoint testing
+ * mockClient.withLatency(&quot;/slow-endpoint.*&quot;, 500L);
+ *
+ * // Test timeout behavior
+ * Result&amp;lt;Response, ApiError&amp;gt; result = mockClient.fluent()
+ *     .get(&quot;/slow-endpoint&quot;, Response.class);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Verifying Invocations&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Make some calls
+ * mockClient.get(&quot;/users/1&quot;, User.class);
+ * mockClient.get(&quot;/users/1&quot;, User.class);
+ *
+ * // Verify call count
+ * assertEquals(2, mockClient.getInvocationCount(&quot;GET&quot;, &quot;/users/1&quot;));
+ *
+ * // Reset for next test
+ * mockClient.resetInvocationCounts();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see RocketRest
+ * @see com.guinetik.rr.http.MockRocketClient
+ * @since 1.0.0
+ */
+public class RocketRestMock extends RocketRest {
+<span class="fc" id="L96">    private final Logger logger = LoggerFactory.getLogger(this.getClass());</span>
+<span class="fc" id="L97">    private final ObjectMapper objectMapper = new ObjectMapper();</span>
+
+    // Map to store mock responses: key is &quot;METHOD:url&quot;, value is response producer
+<span class="fc" id="L100">    private final Map&lt;String, MockResponseDefinition&gt; mockResponses = new HashMap&lt;&gt;();</span>
+    
+    // Map to track invocation counts: key is &quot;METHOD:url&quot;, value is count
+<span class="fc" id="L103">    private final ConcurrentHashMap&lt;String, Integer&gt; invocationCounts = new ConcurrentHashMap&lt;&gt;();</span>
+    
+    // Map to store latency settings: key is url pattern regex, value is latency in ms
+<span class="fc" id="L106">    private final Map&lt;Pattern, Long&gt; latencySettings = new HashMap&lt;&gt;();</span>
+
+    // The mock client implementation
+    private final MockRocketClient mockClient;
+
+    /**
+     * Creates a new mock client instance.
+     *
+     * @param config the configuration for the REST client
+     */
+    public RocketRestMock(RocketRestConfig config) {
+<span class="fc" id="L117">        super(config);</span>
+        
+        // Create the base mock client
+<span class="fc" id="L120">        this.mockClient = new MockRocketClient();</span>
+        
+        // If circuit breaker is enabled, wrap the mock client with CircuitBreakerClient
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (config.getDefaultOptions().getBoolean(HttpConstants.CircuitBreaker.CIRCUIT_BREAKER_ENABLED, false)) {</span>
+<span class="fc" id="L124">            int failureThreshold = config.getDefaultOptions().getInt(</span>
+                HttpConstants.CircuitBreaker.CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+                HttpConstants.CircuitBreaker.DEFAULT_FAILURE_THRESHOLD
+            );
+<span class="fc" id="L128">            long resetTimeoutMs = config.getDefaultOptions().getLong(</span>
+                HttpConstants.CircuitBreaker.CIRCUIT_BREAKER_RESET_TIMEOUT_MS,
+                HttpConstants.CircuitBreaker.DEFAULT_RESET_TIMEOUT_MS
+            );
+            
+            // Create a circuit breaker client with the mock client
+            CircuitBreakerClient circuitBreakerClient;
+            
+            // Set the circuit breaker policy if specified
+<span class="fc" id="L137">            String policyStr = config.getDefaultOptions().getString(</span>
+                HttpConstants.CircuitBreaker.CIRCUIT_BREAKER_FAILURE_POLICY,
+                null
+            );
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">            if (HttpConstants.CircuitBreaker.CIRCUIT_BREAKER_POLICY_SERVER_ONLY.equals(policyStr)) {</span>
+<span class="fc" id="L142">                circuitBreakerClient = new CircuitBreakerClient(</span>
+                    mockClient,
+                    failureThreshold,
+                    resetTimeoutMs,
+                    HttpConstants.CircuitBreaker.DEFAULT_FAILURE_DECAY_TIME_MS,
+                    CircuitBreakerClient.FailurePolicy.SERVER_ERRORS_ONLY,
+                    null
+                );
+            } else {
+<span class="nc" id="L151">                circuitBreakerClient = new CircuitBreakerClient(</span>
+                    mockClient,
+                    failureThreshold,
+                    resetTimeoutMs
+                );
+            }
+            
+            // Set the circuit breaker client as the delegate
+<span class="fc" id="L159">            this.mockClient.setDelegate(circuitBreakerClient);</span>
+        }
+<span class="fc" id="L161">    }</span>
+
+    /**
+     * Mock response definition class that holds both the response producer and whether 
+     * the URL pattern should be treated as a regex pattern.
+     */
+    private static class MockResponseDefinition {
+        final BiFunction&lt;String, Object, Object&gt; responseProducer;
+        final boolean isRegexPattern;
+        final Pattern compiledPattern;
+        
+<span class="fc" id="L172">        MockResponseDefinition(BiFunction&lt;String, Object, Object&gt; responseProducer, boolean isRegexPattern, String pattern) {</span>
+<span class="fc" id="L173">            this.responseProducer = responseProducer;</span>
+<span class="fc" id="L174">            this.isRegexPattern = isRegexPattern;</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            this.compiledPattern = isRegexPattern ? Pattern.compile(pattern) : null;</span>
+<span class="fc" id="L176">        }</span>
+    }
+
+    /**
+     * Adds a mock response for a specific HTTP method and exact URL match.
+     *
+     * @param method           HTTP method (GET, POST, PUT, DELETE)
+     * @param urlPattern       URL pattern to match exactly
+     * @param responseProducer Function that takes (url, requestBody) and returns a response object
+     */
+    public void addMockResponse(String method, String urlPattern,
+                                BiFunction&lt;String, Object, Object&gt; responseProducer) {
+<span class="fc" id="L188">        addMockResponse(method, urlPattern, responseProducer, false);</span>
+<span class="fc" id="L189">    }</span>
+
+    /**
+     * Adds a mock response with the option to use regex pattern matching for URLs.
+     *
+     * @param method           HTTP method (GET, POST, PUT, DELETE)
+     * @param urlPattern       URL pattern (can be a regex pattern if isRegexPattern is true)
+     * @param responseProducer Function that takes (url, requestBody) and returns a response object
+     * @param isRegexPattern   If true, the urlPattern will be treated as a regex pattern
+     */
+    public void addMockResponse(String method, String urlPattern,
+                                BiFunction&lt;String, Object, Object&gt; responseProducer,
+                                boolean isRegexPattern) {
+<span class="fc" id="L202">        String key = method + &quot;:&quot; + urlPattern;</span>
+<span class="fc" id="L203">        mockResponses.put(key, new MockResponseDefinition(responseProducer, isRegexPattern, urlPattern));</span>
+<span class="fc" id="L204">        logger.debug(&quot;Added mock response for {} {} (regex: {})&quot;, method, urlPattern, isRegexPattern);</span>
+<span class="fc" id="L205">    }</span>
+
+    /**
+     * Finds a matching mock response producer for the given method and URL.
+     * Checks for exact matches first, then tries regex pattern matching.
+     */
+    private BiFunction&lt;String, Object, Object&gt; findMatchingResponse(String method, String url) {
+        // Build the key for direct lookup
+<span class="fc" id="L213">        String exactKey = method + &quot;:&quot; + url;</span>
+        
+        // Try direct mapping first for performance
+<span class="fc" id="L216">        MockResponseDefinition exactMatch = mockResponses.get(exactKey);</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (exactMatch != null) {</span>
+            // Track the invocation
+<span class="fc" id="L219">            trackInvocation(method, url);</span>
+<span class="fc" id="L220">            return exactMatch.responseProducer;</span>
+        }
+        
+        // If no direct match, try regex matches
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        for (Map.Entry&lt;String, MockResponseDefinition&gt; entry : mockResponses.entrySet()) {</span>
+<span class="fc" id="L225">            String key = entry.getKey();</span>
+<span class="fc" id="L226">            MockResponseDefinition def = entry.getValue();</span>
+            
+            // Skip if not a regex pattern or if the method doesn't match
+<span class="pc bpc" id="L229" title="1 of 4 branches missed.">            if (!def.isRegexPattern || !key.startsWith(method + &quot;:&quot;)) {</span>
+<span class="nc" id="L230">                continue;</span>
+            }
+            
+            // Check if the URL matches the regex pattern
+<span class="fc" id="L234">            Matcher matcher = def.compiledPattern.matcher(url);</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">            if (matcher.matches()) {</span>
+                // Track the invocation using the pattern as the key
+<span class="fc" id="L237">                trackInvocation(method, key.substring(method.length() + 1));</span>
+<span class="fc" id="L238">                return def.responseProducer;</span>
+            }
+<span class="fc" id="L240">        }</span>
+        
+<span class="fc" id="L242">        return null;</span>
+    }
+    
+    /**
+     * Tracks an invocation of an endpoint for testing verification.
+     */
+    private void trackInvocation(String method, String urlPattern) {
+<span class="fc" id="L249">        String key = method + &quot;:&quot; + urlPattern;</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        invocationCounts.compute(key, (k, v) -&gt; (v == null) ? 1 : v + 1);</span>
+<span class="fc" id="L251">    }</span>
+    
+    /**
+     * Gets the number of times an endpoint was called.
+     * 
+     * @param method HTTP method (GET, POST, PUT, DELETE)
+     * @param urlPattern URL pattern or exact URL
+     * @return The number of invocations, or 0 if never called
+     */
+    public int getInvocationCount(String method, String urlPattern) {
+<span class="fc" id="L261">        String key = method + &quot;:&quot; + urlPattern;</span>
+<span class="fc" id="L262">        return invocationCounts.getOrDefault(key, 0);</span>
+    }
+    
+    /**
+     * Resets all invocation counters.
+     */
+    public void resetInvocationCounts() {
+<span class="fc" id="L269">        invocationCounts.clear();</span>
+<span class="fc" id="L270">    }</span>
+    
+    /**
+     * Adds simulated network latency for a specific URL pattern.
+     * 
+     * @param urlPatternRegex Regex pattern for matching URLs
+     * @param latencyMs Delay in milliseconds
+     */
+    public void withLatency(String urlPatternRegex, long latencyMs) {
+<span class="fc" id="L279">        latencySettings.put(Pattern.compile(urlPatternRegex), latencyMs);</span>
+<span class="fc" id="L280">        logger.debug(&quot;Added latency of {}ms for URL pattern: {}&quot;, latencyMs, urlPatternRegex);</span>
+<span class="fc" id="L281">    }</span>
+    
+    /**
+     * Simulates network latency if configured for the given URL.
+     */
+    private void simulateLatency(String url) {
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        for (Map.Entry&lt;Pattern, Long&gt; entry : latencySettings.entrySet()) {</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">            if (entry.getKey().matcher(url).matches()) {</span>
+<span class="fc" id="L289">                long latency = entry.getValue();</span>
+<span class="fc" id="L290">                logger.debug(&quot;Simulating latency of {}ms for URL: {}&quot;, latency, url);</span>
+                try {
+<span class="fc" id="L292">                    Thread.sleep(latency);</span>
+<span class="nc" id="L293">                } catch (InterruptedException e) {</span>
+<span class="nc" id="L294">                    Thread.currentThread().interrupt();</span>
+<span class="fc" id="L295">                }</span>
+<span class="fc" id="L296">                return; // Only apply the first matching latency</span>
+            }
+<span class="fc" id="L298">        }</span>
+<span class="fc" id="L299">    }</span>
+
+    @Override
+    public &lt;Req, Res&gt; Res execute(RequestSpec&lt;Req, Res&gt; requestSpec) {
+        // Simulate network latency if configured
+<span class="fc" id="L304">        simulateLatency(requestSpec.getEndpoint());</span>
+        
+        // Execute using the mock client (which may be wrapped with CircuitBreakerClient)
+<span class="fc" id="L307">        return mockClient.execute(requestSpec);</span>
+    }
+
+    /**
+     * Helper method to execute a request and wrap the result in a Result object.
+     */
+    private &lt;Req, Res&gt; Result&lt;Res, ApiError&gt; executeWithResult(RequestSpec&lt;Req, Res&gt; requestSpec) {
+        try {
+<span class="fc" id="L315">            Res result = execute(requestSpec);</span>
+<span class="fc" id="L316">            return Result.success(result);</span>
+<span class="fc" id="L317">        } catch (CircuitBreakerOpenException e) {</span>
+<span class="fc" id="L318">            return Result.failure(ApiError.circuitOpenError(e.getMessage()));</span>
+<span class="fc" id="L319">        } catch (RocketRestException e) {</span>
+<span class="fc" id="L320">            return Result.failure(ApiError.httpError(e.getMessage(), e.getStatusCode(), e.getResponseBody()));</span>
+<span class="nc" id="L321">        } catch (Exception e) {</span>
+<span class="nc" id="L322">            return Result.failure(ApiError.networkError(e.getMessage()));</span>
+        }
+    }
+    
+    /**
+     * Provides a mock implementation for sync API calls.
+     */
+    @Override
+    public SyncApi sync() {
+<span class="fc" id="L331">        return new MockSyncApi();</span>
+    }
+    
+    /**
+     * Provides a mock implementation for async API calls.
+     */
+    @Override
+    public AsyncApi async() {
+<span class="fc" id="L339">        return new MockAsyncApi();</span>
+    }
+    
+    /**
+     * Provides a mock implementation for fluent API calls.
+     */
+    public FluentApi fluent() {
+<span class="fc" id="L346">        return new MockFluentApi();</span>
+    }
+
+    public &lt;Req, Res&gt; CompletableFuture&lt;Res&gt; executeAsync(RequestSpec&lt;Req, Res&gt; requestSpec) {
+<span class="fc" id="L350">        return CompletableFuture.supplyAsync(() -&gt; execute(requestSpec));</span>
+    }
+
+    /**
+     * Mock implementation of RocketClient that handles the actual request execution.
+     */
+<span class="fc" id="L356">    private class MockRocketClient implements RocketClient {</span>
+        private RocketClient delegate;
+<span class="fc" id="L358">        private boolean isExecuting = false;</span>
+
+        public void setDelegate(RocketClient delegate) {
+<span class="fc" id="L361">            this.delegate = delegate;</span>
+<span class="fc" id="L362">        }</span>
+
+        @Override
+        public &lt;Req, Res&gt; Res execute(RequestSpec&lt;Req, Res&gt; requestSpec) throws RocketRestException {
+            // If we have a delegate, and we're not yet executing, use it
+<span class="fc bfc" id="L367" title="All 4 branches covered.">            if (delegate != null &amp;&amp; !isExecuting) {</span>
+<span class="fc" id="L368">                isExecuting = true;</span>
+                try {
+<span class="fc" id="L370">                    return delegate.execute(requestSpec);</span>
+                } finally {
+<span class="fc" id="L372">                    isExecuting = false;</span>
+                }
+            }
+
+            // Otherwise handle the request directly
+<span class="fc" id="L377">            BiFunction&lt;String, Object, Object&gt; responseProducer =</span>
+<span class="fc" id="L378">                    findMatchingResponse(requestSpec.getMethod(), requestSpec.getEndpoint());</span>
+
+<span class="fc bfc" id="L380" title="All 2 branches covered.">            if (responseProducer != null) {</span>
+                try {
+<span class="fc" id="L382">                    Object response = responseProducer.apply(</span>
+<span class="fc" id="L383">                            requestSpec.getEndpoint(),</span>
+<span class="fc" id="L384">                            requestSpec.getBody()</span>
+                    );
+
+                    // Convert the response to the expected type
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">                    if (requestSpec.getResponseType().isInstance(response)) {</span>
+                        @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L390">                        Res typedResponse = (Res) response;</span>
+<span class="fc" id="L391">                        return typedResponse;</span>
+<span class="nc bnc" id="L392" title="All 2 branches missed.">                    } else if (response != null) {</span>
+                        // Try to convert using ObjectMapper if types don't match directly
+<span class="nc" id="L394">                        return objectMapper.convertValue(response, requestSpec.getResponseType());</span>
+                    }
+
+<span class="nc" id="L397">                    throw new ApiException(&quot;Mock response could not be converted to required type: &quot;</span>
+<span class="nc" id="L398">                            + requestSpec.getResponseType().getName());</span>
+<span class="fc" id="L399">                } catch (Exception e) {</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">                    if (e instanceof ApiException) {</span>
+<span class="fc" id="L401">                        ApiException apiEx = (ApiException) e;</span>
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">                        if (apiEx.getStatusCode() &gt; 0) {</span>
+<span class="fc" id="L403">                            throw new RocketRestException(</span>
+<span class="fc" id="L404">                                apiEx.getMessage(),</span>
+<span class="fc" id="L405">                                apiEx.getStatusCode(),</span>
+<span class="fc" id="L406">                                apiEx.getResponseBody()</span>
+                            );
+                        }
+                    }
+<span class="fc" id="L410">                    throw new RocketRestException(&quot;Failed to process mock response&quot;, e);</span>
+                }
+            }
+
+<span class="fc" id="L414">            logger.warn(&quot;No mock response found for {} : {}&quot;, requestSpec.getMethod(), requestSpec.getEndpoint());</span>
+<span class="fc" id="L415">            throw new RocketRestException(&quot;No mock response configured for &quot;</span>
+<span class="fc" id="L416">                    + requestSpec.getMethod() + &quot;:&quot; + requestSpec.getEndpoint());</span>
+        }
+
+        @Override
+        public void configureSsl(javax.net.ssl.SSLContext sslContext) {
+            // No-op for a mock client
+<span class="nc" id="L422">        }</span>
+
+        @Override
+        public void setBaseUrl(String baseUrl) {
+
+<span class="nc" id="L427">        }</span>
+    }
+    
+    // Inner class implementations of the API interfaces
+    
+    /**
+     * Implementation of SyncApi that delegates to the underlying DefaultApiClient.
+     */
+<span class="fc" id="L435">    private class MockSyncApi implements SyncApi {</span>
+        @Override
+        public &lt;T&gt; T get(String endpoint, Class&lt;T&gt; responseType) {
+<span class="fc" id="L438">            return execute(createGetRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;T&gt; T get(String endpoint, Class&lt;T&gt; responseType, Map&lt;String, String&gt; queryParams) {
+<span class="nc" id="L443">            return execute(createGetRequest(endpoint, responseType, queryParams));</span>
+        }
+        
+        @Override
+        public &lt;Res&gt; Res post(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="fc" id="L448">            return execute(createPostRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; Res post(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L453">            return execute(createPostRequest(endpoint, body, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Res&gt; Res put(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L458">            return execute(createPutRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; Res put(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L463">            return execute(createPutRequest(endpoint, body, responseType));</span>
+        }
+        
+        @Override
+        public &lt;T&gt; T delete(String endpoint, Class&lt;T&gt; responseType) {
+<span class="nc" id="L468">            return execute(createDeleteRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; Res execute(RequestSpec&lt;Req, Res&gt; requestSpec) {
+<span class="fc" id="L473">            return RocketRestMock.this.execute(requestSpec);</span>
+        }
+    }
+    
+    /**
+     * Implementation of AsyncApi that delegates to the underlying AsyncApiClient.
+     */
+<span class="fc" id="L480">    private class MockAsyncApi implements AsyncApi {</span>
+        @Override
+        public &lt;T&gt; CompletableFuture&lt;T&gt; get(String endpoint, Class&lt;T&gt; responseType) {
+<span class="fc" id="L483">            return executeAsync(createGetRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;T&gt; CompletableFuture&lt;T&gt; get(String endpoint, Class&lt;T&gt; responseType, Map&lt;String, String&gt; queryParams) {
+<span class="nc" id="L488">            return executeAsync(createGetRequest(endpoint, responseType, queryParams));</span>
+        }
+        
+        @Override
+        public &lt;Res&gt; CompletableFuture&lt;Res&gt; post(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L493">            return executeAsync(createPostRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; CompletableFuture&lt;Res&gt; post(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L498">            return executeAsync(createPostRequest(endpoint, body, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Res&gt; CompletableFuture&lt;Res&gt; put(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L503">            return executeAsync(createPutRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; CompletableFuture&lt;Res&gt; put(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L508">            return executeAsync(createPutRequest(endpoint, body, responseType));</span>
+        }
+        
+        @Override
+        public &lt;T&gt; CompletableFuture&lt;T&gt; delete(String endpoint, Class&lt;T&gt; responseType) {
+<span class="nc" id="L513">            return executeAsync(createDeleteRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; CompletableFuture&lt;Res&gt; execute(RequestSpec&lt;Req, Res&gt; requestSpec) {
+<span class="nc" id="L518">            return executeAsync(requestSpec);</span>
+        }
+        
+        @Override
+        public void shutdown() {
+            // No-op for mock
+<span class="nc" id="L524">        }</span>
+    }
+    
+    /**
+     * Implementation of FluentApi that delegates to the underlying FluentApiClient.
+     */
+<span class="fc" id="L530">    private class MockFluentApi implements FluentApi {</span>
+        @Override
+        public &lt;T&gt; Result&lt;T, ApiError&gt; get(String endpoint, Class&lt;T&gt; responseType) {
+<span class="fc" id="L533">            return RocketRestMock.this.executeWithResult(createGetRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;T&gt; Result&lt;T, ApiError&gt; get(String endpoint, Class&lt;T&gt; responseType, Map&lt;String, String&gt; queryParams) {
+<span class="nc" id="L538">            return RocketRestMock.this.executeWithResult(createGetRequest(endpoint, responseType, queryParams));</span>
+        }
+        
+        @Override
+        public &lt;Res&gt; Result&lt;Res, ApiError&gt; post(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L543">            return RocketRestMock.this.executeWithResult(createPostRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; Result&lt;Res, ApiError&gt; post(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L548">            return RocketRestMock.this.executeWithResult(createPostRequest(endpoint, body, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Res&gt; Result&lt;Res, ApiError&gt; put(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L553">            return RocketRestMock.this.executeWithResult(createPutRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; Result&lt;Res, ApiError&gt; put(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L558">            return RocketRestMock.this.executeWithResult(createPutRequest(endpoint, body, responseType));</span>
+        }
+        
+        @Override
+        public &lt;T&gt; Result&lt;T, ApiError&gt; delete(String endpoint, Class&lt;T&gt; responseType) {
+<span class="nc" id="L563">            return RocketRestMock.this.executeWithResult(createDeleteRequest(endpoint, responseType));</span>
+        }
+        
+        @Override
+        public &lt;Req, Res&gt; Result&lt;Res, ApiError&gt; execute(RequestSpec&lt;Req, Res&gt; requestSpec) {
+<span class="nc" id="L568">            return RocketRestMock.this.executeWithResult(requestSpec);</span>
+        }
+    }
+    
+    // Helper methods for creating request specs, reusing parent methods via reflection
+    private &lt;T&gt; RequestSpec&lt;Void, T&gt; createGetRequest(String endpoint, Class&lt;T&gt; responseType) {
+        try {
+<span class="fc" id="L575">            java.lang.reflect.Method method = RocketRest.class.getDeclaredMethod(&quot;createGetRequest&quot;, String.class, Class.class);</span>
+<span class="fc" id="L576">            method.setAccessible(true);</span>
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L578">            RequestSpec&lt;Void, T&gt; result = (RequestSpec&lt;Void, T&gt;) method.invoke(this, endpoint, responseType);</span>
+<span class="fc" id="L579">            return result;</span>
+<span class="nc" id="L580">        } catch (Exception e) {</span>
+<span class="nc" id="L581">            throw new ApiException(&quot;Failed to create GET request&quot;, e);</span>
+        }
+    }
+    
+    private &lt;T&gt; RequestSpec&lt;Void, T&gt; createGetRequest(String endpoint, Class&lt;T&gt; responseType, Map&lt;String, String&gt; queryParams) {
+        try {
+<span class="nc" id="L587">            java.lang.reflect.Method method = RocketRest.class.getDeclaredMethod(&quot;createGetRequest&quot;, String.class, Class.class, Map.class);</span>
+<span class="nc" id="L588">            method.setAccessible(true);</span>
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L590">            RequestSpec&lt;Void, T&gt; result = (RequestSpec&lt;Void, T&gt;) method.invoke(this, endpoint, responseType, queryParams);</span>
+<span class="nc" id="L591">            return result;</span>
+<span class="nc" id="L592">        } catch (Exception e) {</span>
+<span class="nc" id="L593">            throw new ApiException(&quot;Failed to create GET request with params&quot;, e);</span>
+        }
+    }
+    
+    private &lt;Res&gt; RequestSpec&lt;Void, Res&gt; createPostRequest(String endpoint, Class&lt;Res&gt; responseType) {
+        try {
+<span class="fc" id="L599">            java.lang.reflect.Method method = RocketRest.class.getDeclaredMethod(&quot;createPostRequest&quot;, String.class, Class.class);</span>
+<span class="fc" id="L600">            method.setAccessible(true);</span>
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L602">            RequestSpec&lt;Void, Res&gt; result = (RequestSpec&lt;Void, Res&gt;) method.invoke(this, endpoint, responseType);</span>
+<span class="fc" id="L603">            return result;</span>
+<span class="nc" id="L604">        } catch (Exception e) {</span>
+<span class="nc" id="L605">            throw new ApiException(&quot;Failed to create POST request&quot;, e);</span>
+        }
+    }
+    
+    private &lt;Req, Res&gt; RequestSpec&lt;Req, Res&gt; createPostRequest(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+        try {
+<span class="nc" id="L611">            java.lang.reflect.Method method = RocketRest.class.getDeclaredMethod(&quot;createPostRequest&quot;, String.class, Object.class, Class.class);</span>
+<span class="nc" id="L612">            method.setAccessible(true);</span>
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L614">            RequestSpec&lt;Req, Res&gt; result = (RequestSpec&lt;Req, Res&gt;) method.invoke(this, endpoint, body, responseType);</span>
+<span class="nc" id="L615">            return result;</span>
+<span class="nc" id="L616">        } catch (Exception e) {</span>
+<span class="nc" id="L617">            throw new ApiException(&quot;Failed to create POST request with body&quot;, e);</span>
+        }
+    }
+    
+    private &lt;Res&gt; RequestSpec&lt;Void, Res&gt; createPutRequest(String endpoint, Class&lt;Res&gt; responseType) {
+        try {
+<span class="nc" id="L623">            java.lang.reflect.Method method = RocketRest.class.getDeclaredMethod(&quot;createPutRequest&quot;, String.class, Class.class);</span>
+<span class="nc" id="L624">            method.setAccessible(true);</span>
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L626">            RequestSpec&lt;Void, Res&gt; result = (RequestSpec&lt;Void, Res&gt;) method.invoke(this, endpoint, responseType);</span>
+<span class="nc" id="L627">            return result;</span>
+<span class="nc" id="L628">        } catch (Exception e) {</span>
+<span class="nc" id="L629">            throw new ApiException(&quot;Failed to create PUT request&quot;, e);</span>
+        }
+    }
+    
+    private &lt;Req, Res&gt; RequestSpec&lt;Req, Res&gt; createPutRequest(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+        try {
+<span class="nc" id="L635">            java.lang.reflect.Method method = RocketRest.class.getDeclaredMethod(&quot;createPutRequest&quot;, String.class, Object.class, Class.class);</span>
+<span class="nc" id="L636">            method.setAccessible(true);</span>
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L638">            RequestSpec&lt;Req, Res&gt; result = (RequestSpec&lt;Req, Res&gt;) method.invoke(this, endpoint, body, responseType);</span>
+<span class="nc" id="L639">            return result;</span>
+<span class="nc" id="L640">        } catch (Exception e) {</span>
+<span class="nc" id="L641">            throw new ApiException(&quot;Failed to create PUT request with body&quot;, e);</span>
+        }
+    }
+    
+    private &lt;T&gt; RequestSpec&lt;Void, T&gt; createDeleteRequest(String endpoint, Class&lt;T&gt; responseType) {
+        try {
+<span class="nc" id="L647">            java.lang.reflect.Method method = RocketRest.class.getDeclaredMethod(&quot;createDeleteRequest&quot;, String.class, Class.class);</span>
+<span class="nc" id="L648">            method.setAccessible(true);</span>
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L650">            RequestSpec&lt;Void, T&gt; result = (RequestSpec&lt;Void, T&gt;) method.invoke(this, endpoint, responseType);</span>
+<span class="nc" id="L651">            return result;</span>
+<span class="nc" id="L652">        } catch (Exception e) {</span>
+<span class="nc" id="L653">            throw new ApiException(&quot;Failed to create DELETE request&quot;, e);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

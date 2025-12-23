@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BearerTokenStrategy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.auth</a> &gt; <span class="el_source">BearerTokenStrategy.java</span></div><h1>BearerTokenStrategy.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.auth;
+
+import com.guinetik.rr.http.RocketHeaders;
+import java.util.function.BooleanSupplier;
+
+/**
+ * Authentication strategy that uses Bearer token authentication.
+ *
+ * &lt;p&gt;This strategy adds an {@code Authorization: Bearer &lt;token&gt;} header to all requests.
+ * It's suitable for APIs that use API keys, JWT tokens, or other bearer-style authentication.
+ *
+ * &lt;h2&gt;Basic Usage&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Create via factory (recommended)
+ * AuthStrategy auth = AuthStrategyFactory.createBearerToken(&quot;my-api-token&quot;);
+ *
+ * // Configure client
+ * RocketRestConfig config = RocketRestConfig.builder(&quot;https://api.example.com&quot;)
+ *     .authStrategy(auth)
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;With Custom Refresh Logic&lt;/h2&gt;
+ * &lt;p&gt;For tokens that expire, you can provide custom refresh logic:
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * AtomicReference&amp;lt;String&amp;gt; tokenRef = new AtomicReference&amp;lt;&amp;gt;(&quot;initial-token&quot;);
+ *
+ * AuthStrategy auth = AuthStrategyFactory.createBearerToken(tokenRef.get(), () -&amp;gt; {
+ *     try {
+ *         String newToken = myAuthService.refreshToken();
+ *         tokenRef.set(newToken);
+ *         return true;
+ *     } catch (Exception e) {
+ *         return false;
+ *     }
+ * });
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;For OAuth Tokens&lt;/h2&gt;
+ * &lt;p&gt;If your bearer token comes from an OAuth flow, consider using the dedicated OAuth strategies
+ * which handle token refresh automatically:
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@link OAuth2ClientCredentialsStrategy}&lt;/li&gt;
+ *   &lt;li&gt;{@link OAuth2PasswordStrategy}&lt;/li&gt;
+ *   &lt;li&gt;{@link OAuth2AssertionStrategy}&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see AuthStrategy
+ * @see AuthStrategyFactory#createBearerToken(String)
+ * @since 1.0.0
+ */
+public class BearerTokenStrategy implements AuthStrategy {
+
+    private final String token;
+    private final BooleanSupplier refreshTokenLogic;
+
+    /**
+     * Creates a new BearerTokenStrategy with no custom refresh logic.
+     * In this case, {@link #refreshCredentials()} will always return {@code false}.
+     *
+     * @param token the bearer token
+     */
+    public BearerTokenStrategy(String token) {
+<span class="fc" id="L65">        this(token, () -&gt; false);</span>
+<span class="fc" id="L66">    }</span>
+
+    /**
+     * Creates a new BearerTokenStrategy with custom token refresh logic.
+     *
+     * @param token             the bearer token
+     * @param refreshTokenLogic a {@link BooleanSupplier} that will be invoked by {@link #refreshCredentials()}.
+     *                          It should return {@code true} if the token was successfully refreshed, {@code false} otherwise.
+     */
+<span class="fc" id="L75">    public BearerTokenStrategy(String token, BooleanSupplier refreshTokenLogic) {</span>
+<span class="fc" id="L76">        this.token = token;</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        this.refreshTokenLogic = refreshTokenLogic != null ? refreshTokenLogic : () -&gt; false;</span>
+<span class="fc" id="L78">    }</span>
+
+    @Override
+    public AuthType getType() {
+<span class="nc" id="L82">        return AuthType.BEARER_TOKEN;</span>
+    }
+
+    @Override
+    public RocketHeaders applyAuthHeaders(RocketHeaders headers) {
+<span class="pc bpc" id="L87" title="2 of 4 branches missed.">        if (token != null &amp;&amp; !token.isEmpty()) {</span>
+<span class="fc" id="L88">            headers.bearerAuth(token);</span>
+        }
+<span class="fc" id="L90">        return headers;</span>
+    }
+
+    @Override
+    public boolean needsTokenRefresh() {
+<span class="nc" id="L95">        return false;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     * &lt;p&gt;
+     * If a custom {@code refreshTokenLogic} was provided during construction,
+     * this method will invoke it and return its result.
+     * &lt;p&gt;
+     * If no custom logic was provided, this method always returns {@code false},
+     * as this strategy itself does not handle credential refresh.
+     */
+    @Override
+    public boolean refreshCredentials() {
+<span class="fc" id="L109">        return this.refreshTokenLogic.getAsBoolean();</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

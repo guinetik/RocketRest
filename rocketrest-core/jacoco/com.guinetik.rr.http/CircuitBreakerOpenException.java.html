@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CircuitBreakerOpenException.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.http</a> &gt; <span class="el_source">CircuitBreakerOpenException.java</span></div><h1>CircuitBreakerOpenException.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.http;
+
+/**
+ * Exception thrown when a request is rejected due to an open circuit breaker.
+ *
+ * &lt;p&gt;This exception indicates that the downstream service is considered unhealthy and
+ * requests are being fast-failed to prevent cascading failures. It provides timing
+ * information to help callers decide when to retry.
+ *
+ * &lt;h2&gt;Handling Circuit Open&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * try {
+ *     User user = client.get(&quot;/users/1&quot;, User.class);
+ * } catch (CircuitBreakerOpenException e) {
+ *     long waitTime = e.getEstimatedMillisUntilReset();
+ *
+ *     if (waitTime &amp;gt; 0) {
+ *         System.out.println(&quot;Service unavailable, retry in &quot; + waitTime + &quot;ms&quot;);
+ *         // Schedule retry after waitTime
+ *     } else {
+ *         // Circuit should be half-open soon, retry immediately
+ *         System.out.println(&quot;Circuit may reset soon, retrying...&quot;);
+ *     }
+ * }
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Using with Fluent API&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * Result&amp;lt;User, ApiError&amp;gt; result = client.fluent().get(&quot;/users/1&quot;, User.class);
+ *
+ * result.match(
+ *     user -&amp;gt; System.out.println(&quot;Success&quot;),
+ *     error -&amp;gt; {
+ *         if (error.isCircuitOpen()) {
+ *             System.out.println(&quot;Circuit breaker is open&quot;);
+ *         }
+ *     }
+ * );
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see CircuitBreakerClient
+ * @see RocketRestException
+ * @since 1.0.0
+ */
+public class CircuitBreakerOpenException extends RocketRestException {
+    
+    private static final long serialVersionUID = 1L;
+    private final long millisSinceLastFailure;
+    private final long resetTimeoutMs;
+    
+    /**
+     * Creates a new CircuitBreakerOpenException with the specified message.
+     *
+     * @param message The error message
+     */
+    public CircuitBreakerOpenException(String message) {
+<span class="fc" id="L58">        this(message, 0, 0);</span>
+<span class="fc" id="L59">    }</span>
+    
+    /**
+     * Creates a new CircuitBreakerOpenException with the specified message 
+     * and timing information about when the circuit might reset.
+     *
+     * @param message The error message
+     * @param millisSinceLastFailure Milliseconds since the last failure
+     * @param resetTimeoutMs Milliseconds until the circuit will attempt to reset
+     */
+    public CircuitBreakerOpenException(String message, long millisSinceLastFailure, long resetTimeoutMs) {
+<span class="fc" id="L70">        super(message);</span>
+<span class="fc" id="L71">        this.millisSinceLastFailure = millisSinceLastFailure;</span>
+<span class="fc" id="L72">        this.resetTimeoutMs = resetTimeoutMs;</span>
+<span class="fc" id="L73">    }</span>
+    
+    /**
+     * Creates a new CircuitBreakerOpenException with the specified message, cause, 
+     * and timing information about when the circuit might reset.
+     *
+     * @param message The error message
+     * @param cause The cause of this exception
+     * @param millisSinceLastFailure Milliseconds since the last failure
+     * @param resetTimeoutMs Milliseconds until the circuit will attempt to reset
+     */
+    public CircuitBreakerOpenException(String message, Throwable cause, 
+                                      long millisSinceLastFailure, long resetTimeoutMs) {
+<span class="fc" id="L86">        super(message, cause);</span>
+<span class="fc" id="L87">        this.millisSinceLastFailure = millisSinceLastFailure;</span>
+<span class="fc" id="L88">        this.resetTimeoutMs = resetTimeoutMs;</span>
+<span class="fc" id="L89">    }</span>
+    
+    /**
+     * Gets the milliseconds since the last failure that caused the circuit to open.
+     *
+     * @return milliseconds since the last failure, or 0 if not available
+     */
+    public long getMillisSinceLastFailure() {
+<span class="nc" id="L97">        return millisSinceLastFailure;</span>
+    }
+    
+    /**
+     * Gets the configured timeout after which the circuit will try to reset.
+     *
+     * @return reset timeout in milliseconds, or 0 if not available
+     */
+    public long getResetTimeoutMs() {
+<span class="fc" id="L106">        return resetTimeoutMs;</span>
+    }
+    
+    /**
+     * Gets an estimated time in milliseconds until the circuit might reset.
+     * A negative value indicates the circuit should have already attempted to reset.
+     *
+     * @return estimated milliseconds until reset, or 0 if timing data is unavailable
+     */
+    public long getEstimatedMillisUntilReset() {
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (resetTimeoutMs &gt; 0) {</span>
+<span class="fc" id="L117">            return resetTimeoutMs - millisSinceLastFailure;</span>
+        }
+<span class="nc" id="L119">        return 0;</span>
+    }
+    
+    /**
+     * Gets the underlying cause of the circuit opening.
+     * This may be null if the circuit was already open when the request was made.
+     *
+     * @return the cause exception that led to the circuit opening, or null if not available
+     */
+    @Override
+    public Throwable getCause() {
+<span class="nc" id="L130">        return super.getCause();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

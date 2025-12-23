@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RequestBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.request</a> &gt; <span class="el_source">RequestBuilder.java</span></div><h1>RequestBuilder.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.request;
+
+import com.guinetik.rr.http.RocketHeaders;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Fluent builder for constructing {@link RequestSpec} instances.
+ *
+ * &lt;p&gt;This builder provides a clean, type-safe API for creating HTTP request specifications
+ * with all necessary parameters like endpoint, method, headers, body, and response type.
+ *
+ * &lt;h2&gt;Static Factory Methods&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // GET request
+ * RequestSpec&amp;lt;Void, User&amp;gt; getUser = RequestBuilder.&amp;lt;Void, User&amp;gt;get(&quot;/users/1&quot;)
+ *     .responseType(User.class)
+ *     .build();
+ *
+ * // POST request with body
+ * RequestSpec&amp;lt;CreateUser, User&amp;gt; createUser = RequestBuilder.&amp;lt;CreateUser, User&amp;gt;post(&quot;/users&quot;)
+ *     .body(new CreateUser(&quot;John&quot;, &quot;john@example.com&quot;))
+ *     .responseType(User.class)
+ *     .build();
+ *
+ * // PUT request
+ * RequestSpec&amp;lt;UpdateUser, User&amp;gt; updateUser = RequestBuilder.&amp;lt;UpdateUser, User&amp;gt;put(&quot;/users/1&quot;)
+ *     .body(new UpdateUser(&quot;John Doe&quot;))
+ *     .responseType(User.class)
+ *     .build();
+ *
+ * // DELETE request
+ * RequestSpec&amp;lt;Void, Void&amp;gt; deleteUser = RequestBuilder.&amp;lt;Void, Void&amp;gt;delete(&quot;/users/1&quot;)
+ *     .responseType(Void.class)
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;With Headers and Query Params&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * Map&amp;lt;String, String&amp;gt; params = new HashMap&amp;lt;&amp;gt;();
+ * params.put(&quot;page&quot;, &quot;1&quot;);
+ * params.put(&quot;limit&quot;, &quot;10&quot;);
+ *
+ * RequestSpec&amp;lt;Void, UserList&amp;gt; request = RequestBuilder.&amp;lt;Void, UserList&amp;gt;get(&quot;/users&quot;)
+ *     .queryParams(params)
+ *     .headers(RocketHeaders.defaultJson().set(&quot;X-Custom&quot;, &quot;value&quot;))
+ *     .responseType(UserList.class)
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @param &lt;Req&gt; the type of the request body
+ * @param &lt;Res&gt; the type of the response
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see RequestSpec
+ * @since 1.0.0
+ */
+<span class="fc" id="L58">public class RequestBuilder&lt;Req, Res&gt; {</span>
+    private String endpoint;
+<span class="fc" id="L60">    private String method = &quot;GET&quot;;</span>
+<span class="fc" id="L61">    private Map&lt;String, String&gt; queryParams = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L62">    private RocketHeaders headers = RocketHeaders.defaultJson();</span>
+    private Req body;
+    private Class&lt;Res&gt; responseType;
+
+    /**
+     * Creates a GET request builder for the specified endpoint.
+     *
+     * @param endpoint the API endpoint.
+     * @param &lt;Req&gt; The type of the request body.
+     * @param &lt;Res&gt; The type of the response.
+     * @return a new builder instance.
+     */
+    public static &lt;Req, Res&gt; RequestBuilder&lt;Req, Res&gt; get(String endpoint) {
+<span class="fc" id="L75">        return new RequestBuilder&lt;Req, Res&gt;().endpoint(endpoint).method(&quot;GET&quot;);</span>
+    }
+
+    /**
+     * Creates a POST request builder for the specified endpoint.
+     *
+     * @param endpoint the API endpoint.
+     * @param &lt;Req&gt; The type of the request body.
+     * @param &lt;Res&gt; The type of the response.
+     * @return a new builder instance.
+     */
+    public static &lt;Req, Res&gt; RequestBuilder&lt;Req, Res&gt; post(String endpoint) {
+<span class="fc" id="L87">        return new RequestBuilder&lt;Req, Res&gt;().endpoint(endpoint).method(&quot;POST&quot;);</span>
+    }
+
+    /**
+     * Creates a PUT request builder for the specified endpoint.
+     *
+     * @param endpoint the API endpoint.
+     * @param &lt;Req&gt; The type of the request body.
+     * @param &lt;Res&gt; The type of the response.
+     * @return a new builder instance.
+     */
+    public static &lt;Req, Res&gt; RequestBuilder&lt;Req, Res&gt; put(String endpoint) {
+<span class="nc" id="L99">        return new RequestBuilder&lt;Req, Res&gt;().endpoint(endpoint).method(&quot;PUT&quot;);</span>
+    }
+
+    /**
+     * Creates a DELETE request builder for the specified endpoint.
+     *
+     * @param endpoint the API endpoint.
+     * @param &lt;Req&gt; The type of the request body.
+     * @param &lt;Res&gt; The type of the response.
+     * @return a new builder instance.
+     */
+    public static &lt;Req, Res&gt; RequestBuilder&lt;Req, Res&gt; delete(String endpoint) {
+<span class="nc" id="L111">        return new RequestBuilder&lt;Req, Res&gt;().endpoint(endpoint).method(&quot;DELETE&quot;);</span>
+    }
+
+    /**
+     * Sets the API endpoint for the request.
+     *
+     * @param endpoint the API endpoint.
+     * @return the builder instance.
+     */
+    public RequestBuilder&lt;Req, Res&gt; endpoint(String endpoint) {
+<span class="fc" id="L121">        this.endpoint = endpoint;</span>
+<span class="fc" id="L122">        return this;</span>
+    }
+
+    /**
+     * Sets the HTTP method for the request.
+     *
+     * @param method the HTTP method (e.g., GET, POST, PUT, DELETE).
+     * @return the builder instance.
+     */
+    public RequestBuilder&lt;Req, Res&gt; method(String method) {
+<span class="fc" id="L132">        this.method = method;</span>
+<span class="fc" id="L133">        return this;</span>
+    }
+
+    /**
+     * Sets the query parameters for the request.
+     *
+     * @param queryParams a map of query parameters.
+     * @return the builder instance.
+     */
+    public RequestBuilder&lt;Req, Res&gt; queryParams(Map&lt;String, String&gt; queryParams) {
+<span class="fc" id="L143">        this.queryParams = queryParams;</span>
+<span class="fc" id="L144">        return this;</span>
+    }
+
+    /**
+     * Adds a single query parameter to the request.
+     *
+     * @param name the parameter name.
+     * @param value the parameter value.
+     * @return the builder instance.
+     */
+    public RequestBuilder&lt;Req, Res&gt; queryParam(String name, String value) {
+<span class="fc" id="L155">        this.queryParams.put(name, value);</span>
+<span class="fc" id="L156">        return this;</span>
+    }
+
+    /**
+     * Sets the headers for the request.
+     *
+     * @param headers a map of headers.
+     * @return the builder instance.
+     */
+    public RequestBuilder&lt;Req, Res&gt; headers(RocketHeaders headers) {
+<span class="fc" id="L166">        this.headers = headers;</span>
+<span class="fc" id="L167">        return this;</span>
+    }
+
+    /**
+     * Sets the body of the request.
+     *
+     * @param body the request body.
+     * @return the builder instance.
+     */
+    public RequestBuilder&lt;Req, Res&gt; body(Req body) {
+<span class="fc" id="L177">        this.body = body;</span>
+<span class="fc" id="L178">        return this;</span>
+    }
+
+    /**
+     * Sets the expected response type of the request.
+     *
+     * @param responseType the response type.
+     * @return the builder instance.
+     */
+    public RequestBuilder&lt;Req, Res&gt; responseType(Class&lt;Res&gt; responseType) {
+<span class="fc" id="L188">        this.responseType = responseType;</span>
+<span class="fc" id="L189">        return this;</span>
+    }
+
+    /**
+     * Builds and returns a {@link RequestSpec} instance.
+     *
+     * @return the constructed {@link RequestSpec}.
+     */
+    public RequestSpec&lt;Req, Res&gt; build() {
+<span class="fc" id="L198">        return new RequestSpec&lt;&gt;(endpoint, method, queryParams, headers, body, responseType);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

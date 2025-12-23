@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RetryInterceptor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.interceptor</a> &gt; <span class="el_source">RetryInterceptor.java</span></div><h1>RetryInterceptor.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.interceptor;
+
+import com.guinetik.rr.http.CircuitBreakerOpenException;
+import com.guinetik.rr.http.HttpConstants;
+import com.guinetik.rr.http.RocketRestException;
+import com.guinetik.rr.request.RequestSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.function.Predicate;
+
+/**
+ * Interceptor that retries failed requests with configurable backoff.
+ *
+ * &lt;p&gt;This interceptor catches exceptions during request execution and retries
+ * them based on configurable criteria. It supports exponential backoff,
+ * maximum retry limits, and custom retry predicates.
+ *
+ * &lt;h2&gt;Default Retry Behavior&lt;/h2&gt;
+ * &lt;p&gt;By default, retries are attempted for:
+ * &lt;ul&gt;
+ *   &lt;li&gt;5xx Server Errors (500-599)&lt;/li&gt;
+ *   &lt;li&gt;408 Request Timeout&lt;/li&gt;
+ *   &lt;li&gt;429 Too Many Requests&lt;/li&gt;
+ *   &lt;li&gt;Network/Connection errors (status code 0 or -1)&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;The following are NOT retried:
+ * &lt;ul&gt;
+ *   &lt;li&gt;4xx Client Errors (except 408, 429)&lt;/li&gt;
+ *   &lt;li&gt;{@link CircuitBreakerOpenException} (circuit is open)&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;h2&gt;Basic Usage&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Retry up to 3 times with 1 second initial delay
+ * RetryInterceptor retry = new RetryInterceptor(3, 1000);
+ *
+ * RocketClient client = RocketClientFactory.builder(&quot;https://api.example.com&quot;)
+ *     .withInterceptor(retry)
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Exponential Backoff&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Retry with exponential backoff: 1s, 2s, 4s
+ * RetryInterceptor retry = new RetryInterceptor(3, 1000, 2.0);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Custom Retry Predicate&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Only retry on specific status codes
+ * RetryInterceptor retry = RetryInterceptor.builder()
+ *     .maxRetries(3)
+ *     .initialDelayMs(500)
+ *     .retryOn(e -&amp;gt; e.getStatusCode() == 503)
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see RequestInterceptor
+ * @see InterceptorChain
+ * @since 1.1.0
+ */
+public class RetryInterceptor implements RequestInterceptor {
+
+<span class="fc" id="L70">    private static final Logger logger = LoggerFactory.getLogger(RetryInterceptor.class);</span>
+
+    /** Default status codes that trigger retry */
+<span class="fc" id="L73">    private static final Set&lt;Integer&gt; DEFAULT_RETRYABLE_STATUS_CODES = new HashSet&lt;Integer&gt;(</span>
+<span class="fc" id="L74">        Arrays.asList(</span>
+<span class="fc" id="L75">            HttpConstants.StatusCodes.INTERNAL_SERVER_ERROR,  // 500</span>
+<span class="fc" id="L76">            HttpConstants.StatusCodes.BAD_GATEWAY,            // 502</span>
+<span class="fc" id="L77">            HttpConstants.StatusCodes.SERVICE_UNAVAILABLE,    // 503</span>
+<span class="fc" id="L78">            504,  // Gateway Timeout</span>
+<span class="fc" id="L79">            408,  // Request Timeout</span>
+<span class="fc" id="L80">            429   // Too Many Requests</span>
+        )
+    );
+
+    private final int maxRetries;
+    private final long initialDelayMs;
+    private final double backoffMultiplier;
+    private final long maxDelayMs;
+    private final Predicate&lt;RocketRestException&gt; retryPredicate;
+
+    /**
+     * Creates a retry interceptor with default settings.
+     * Uses 3 retries, 1 second initial delay, 2x backoff, 30 second max delay.
+     */
+    public RetryInterceptor() {
+<span class="nc" id="L95">        this(3, 1000, 2.0, 30000, null);</span>
+<span class="nc" id="L96">    }</span>
+
+    /**
+     * Creates a retry interceptor with custom retry count and delay.
+     *
+     * @param maxRetries Maximum number of retries (must be positive)
+     * @param initialDelayMs Initial delay between retries in milliseconds
+     */
+    public RetryInterceptor(int maxRetries, long initialDelayMs) {
+<span class="fc" id="L105">        this(maxRetries, initialDelayMs, 2.0, 30000, null);</span>
+<span class="fc" id="L106">    }</span>
+
+    /**
+     * Creates a retry interceptor with exponential backoff.
+     *
+     * @param maxRetries Maximum number of retries
+     * @param initialDelayMs Initial delay in milliseconds
+     * @param backoffMultiplier Multiplier for each subsequent retry (e.g., 2.0 for doubling)
+     */
+    public RetryInterceptor(int maxRetries, long initialDelayMs, double backoffMultiplier) {
+<span class="nc" id="L116">        this(maxRetries, initialDelayMs, backoffMultiplier, 30000, null);</span>
+<span class="nc" id="L117">    }</span>
+
+    /**
+     * Creates a fully customized retry interceptor.
+     *
+     * @param maxRetries Maximum number of retries
+     * @param initialDelayMs Initial delay in milliseconds
+     * @param backoffMultiplier Multiplier for exponential backoff
+     * @param maxDelayMs Maximum delay cap in milliseconds
+     * @param retryPredicate Custom predicate to determine if exception is retryable (null for default)
+     */
+    public RetryInterceptor(int maxRetries, long initialDelayMs, double backoffMultiplier,
+<span class="fc" id="L129">                           long maxDelayMs, Predicate&lt;RocketRestException&gt; retryPredicate) {</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (maxRetries &lt; 0) {</span>
+<span class="fc" id="L131">            throw new IllegalArgumentException(&quot;maxRetries must be non-negative&quot;);</span>
+        }
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (initialDelayMs &lt; 0) {</span>
+<span class="fc" id="L134">            throw new IllegalArgumentException(&quot;initialDelayMs must be non-negative&quot;);</span>
+        }
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (backoffMultiplier &lt; 1.0) {</span>
+<span class="fc" id="L137">            throw new IllegalArgumentException(&quot;backoffMultiplier must be &gt;= 1.0&quot;);</span>
+        }
+
+<span class="fc" id="L140">        this.maxRetries = maxRetries;</span>
+<span class="fc" id="L141">        this.initialDelayMs = initialDelayMs;</span>
+<span class="fc" id="L142">        this.backoffMultiplier = backoffMultiplier;</span>
+<span class="fc" id="L143">        this.maxDelayMs = maxDelayMs;</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        this.retryPredicate = retryPredicate != null ? retryPredicate : createDefaultPredicate();</span>
+<span class="fc" id="L145">    }</span>
+
+    @Override
+    public &lt;Req, Res&gt; Res onError(RocketRestException e, RequestSpec&lt;Req, Res&gt; request,
+                                   InterceptorChain chain) throws RocketRestException {
+<span class="fc" id="L150">        int currentRetry = chain.getRetryCount();</span>
+
+        // Check if we should retry
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (currentRetry &gt;= maxRetries) {</span>
+<span class="fc" id="L154">            logger.debug(&quot;Max retries ({}) exceeded for {} {}&quot;,</span>
+<span class="fc" id="L155">                maxRetries, request.getMethod(), request.getEndpoint());</span>
+<span class="fc" id="L156">            throw e;</span>
+        }
+
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (!retryPredicate.test(e)) {</span>
+<span class="fc" id="L160">            logger.debug(&quot;Exception not retryable: {} (status {})&quot;,</span>
+<span class="fc" id="L161">                e.getClass().getSimpleName(), e.getStatusCode());</span>
+<span class="fc" id="L162">            throw e;</span>
+        }
+
+        // Calculate delay with exponential backoff
+<span class="fc" id="L166">        long delay = calculateDelay(currentRetry);</span>
+
+<span class="fc" id="L168">        logger.info(&quot;Retrying request {} {} (attempt {}/{}) after {}ms due to: {}&quot;,</span>
+<span class="fc" id="L169">            request.getMethod(), request.getEndpoint(),</span>
+<span class="fc" id="L170">            currentRetry + 1, maxRetries, delay, e.getMessage());</span>
+
+        // Sleep before retry
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (delay &gt; 0) {</span>
+            try {
+<span class="fc" id="L175">                Thread.sleep(delay);</span>
+<span class="nc" id="L176">            } catch (InterruptedException ie) {</span>
+<span class="nc" id="L177">                Thread.currentThread().interrupt();</span>
+<span class="nc" id="L178">                throw new RocketRestException(&quot;Retry interrupted&quot;, ie);</span>
+<span class="fc" id="L179">            }</span>
+        }
+
+        // Retry the request
+<span class="fc" id="L183">        return chain.retry(request);</span>
+    }
+
+    @Override
+    public int getOrder() {
+<span class="fc" id="L188">        return 100; // Run after most interceptors, before logging</span>
+    }
+
+    /**
+     * Calculates the delay for a given retry attempt using exponential backoff.
+     */
+    private long calculateDelay(int retryCount) {
+<span class="fc" id="L195">        double delay = initialDelayMs * Math.pow(backoffMultiplier, retryCount);</span>
+<span class="fc" id="L196">        return Math.min((long) delay, maxDelayMs);</span>
+    }
+
+    /**
+     * Creates the default retry predicate.
+     */
+    private Predicate&lt;RocketRestException&gt; createDefaultPredicate() {
+<span class="fc" id="L203">        return new Predicate&lt;RocketRestException&gt;() {</span>
+            @Override
+            public boolean test(RocketRestException e) {
+                // Never retry circuit breaker exceptions
+<span class="fc bfc" id="L207" title="All 2 branches covered.">                if (e instanceof CircuitBreakerOpenException) {</span>
+<span class="fc" id="L208">                    return false;</span>
+                }
+
+<span class="fc" id="L211">                int statusCode = e.getStatusCode();</span>
+
+                // Retry on connection errors (no status code)
+<span class="fc bfc" id="L214" title="All 2 branches covered.">                if (statusCode &lt;= 0) {</span>
+<span class="fc" id="L215">                    return true;</span>
+                }
+
+                // Retry on specific status codes
+<span class="fc bfc" id="L219" title="All 2 branches covered.">                if (DEFAULT_RETRYABLE_STATUS_CODES.contains(statusCode)) {</span>
+<span class="fc" id="L220">                    return true;</span>
+                }
+
+                // Retry on any 5xx error
+<span class="pc bpc" id="L224" title="3 of 4 branches missed.">                if (statusCode &gt;= HttpConstants.StatusCodes.SERVER_ERROR_MIN &amp;&amp;</span>
+                    statusCode &lt;= HttpConstants.StatusCodes.SERVER_ERROR_MAX) {
+<span class="nc" id="L226">                    return true;</span>
+                }
+
+<span class="fc" id="L229">                return false;</span>
+            }
+        };
+    }
+
+    /**
+     * Creates a builder for custom retry configuration.
+     *
+     * @return A new builder instance
+     */
+    public static Builder builder() {
+<span class="fc" id="L240">        return new Builder();</span>
+    }
+
+    /**
+     * Builder for creating customized RetryInterceptor instances.
+     */
+<span class="fc" id="L246">    public static class Builder {</span>
+<span class="fc" id="L247">        private int maxRetries = 3;</span>
+<span class="fc" id="L248">        private long initialDelayMs = 1000;</span>
+<span class="fc" id="L249">        private double backoffMultiplier = 2.0;</span>
+<span class="fc" id="L250">        private long maxDelayMs = 30000;</span>
+        private Predicate&lt;RocketRestException&gt; retryPredicate;
+
+        /**
+         * Sets the maximum number of retries.
+         *
+         * @param maxRetries Maximum retries (must be non-negative)
+         * @return This builder
+         */
+        public Builder maxRetries(int maxRetries) {
+<span class="fc" id="L260">            this.maxRetries = maxRetries;</span>
+<span class="fc" id="L261">            return this;</span>
+        }
+
+        /**
+         * Sets the initial delay between retries.
+         *
+         * @param initialDelayMs Delay in milliseconds
+         * @return This builder
+         */
+        public Builder initialDelayMs(long initialDelayMs) {
+<span class="fc" id="L271">            this.initialDelayMs = initialDelayMs;</span>
+<span class="fc" id="L272">            return this;</span>
+        }
+
+        /**
+         * Sets the backoff multiplier for exponential backoff.
+         *
+         * @param multiplier Multiplier (must be &gt;= 1.0)
+         * @return This builder
+         */
+        public Builder backoffMultiplier(double multiplier) {
+<span class="fc" id="L282">            this.backoffMultiplier = multiplier;</span>
+<span class="fc" id="L283">            return this;</span>
+        }
+
+        /**
+         * Sets the maximum delay cap.
+         *
+         * @param maxDelayMs Maximum delay in milliseconds
+         * @return This builder
+         */
+        public Builder maxDelayMs(long maxDelayMs) {
+<span class="fc" id="L293">            this.maxDelayMs = maxDelayMs;</span>
+<span class="fc" id="L294">            return this;</span>
+        }
+
+        /**
+         * Sets a custom predicate to determine if an exception should trigger retry.
+         *
+         * @param predicate The retry predicate
+         * @return This builder
+         */
+        public Builder retryOn(Predicate&lt;RocketRestException&gt; predicate) {
+<span class="fc" id="L304">            this.retryPredicate = predicate;</span>
+<span class="fc" id="L305">            return this;</span>
+        }
+
+        /**
+         * Builds the RetryInterceptor with configured settings.
+         *
+         * @return A new RetryInterceptor instance
+         */
+        public RetryInterceptor build() {
+<span class="fc" id="L314">            return new RetryInterceptor(maxRetries, initialDelayMs, backoffMultiplier,</span>
+                maxDelayMs, retryPredicate);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

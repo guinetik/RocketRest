@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonObjectMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.json</a> &gt; <span class="el_source">JsonObjectMapper.java</span></div><h1>JsonObjectMapper.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.json;
+
+import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Pre-configured Jackson {@link ObjectMapper} with utility methods for JSON operations.
+ *
+ * &lt;p&gt;This class extends Jackson's ObjectMapper with RocketRest-specific configuration and
+ * provides convenient static methods for common JSON serialization and deserialization tasks.
+ *
+ * &lt;h2&gt;Default Configuration&lt;/h2&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;Field visibility: ANY (serializes private fields)&lt;/li&gt;
+ *   &lt;li&gt;Getter/Setter visibility: NONE (ignores getters/setters)&lt;/li&gt;
+ *   &lt;li&gt;Indented output: enabled&lt;/li&gt;
+ *   &lt;li&gt;Unknown properties: ignored&lt;/li&gt;
+ *   &lt;li&gt;Null values: excluded from output&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;h2&gt;Object Serialization&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * User user = new User(&quot;John&quot;, &quot;john@example.com&quot;);
+ *
+ * // To JSON string (indented)
+ * String json = JsonObjectMapper.toJsonString(user);
+ *
+ * // To JSON string (compact)
+ * String compact = JsonObjectMapper.toJsonStringNoIdent(user);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Object Deserialization&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * String json = &quot;{\&quot;name\&quot;:\&quot;John\&quot;,\&quot;email\&quot;:\&quot;john@example.com\&quot;}&quot;;
+ *
+ * // To typed object
+ * User user = JsonObjectMapper.jsonToObject(json, User.class);
+ *
+ * // To Map
+ * Map&amp;lt;String, Object&amp;gt; map = JsonObjectMapper.jsonToMap(json);
+ *
+ * // To List of Maps
+ * String arrayJson = &quot;[{\&quot;id\&quot;:1},{\&quot;id\&quot;:2}]&quot;;
+ * List&amp;lt;Map&amp;lt;String, Object&amp;gt;&amp;gt; list = JsonObjectMapper.jsonToListOfMap(arrayJson);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;JsonNode Operations&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * JsonNode node = JsonObjectMapper.getJsonNode(json);
+ * String name = node.get(&quot;name&quot;).asText();
+ *
+ * Map&amp;lt;String, Object&amp;gt; map = JsonObjectMapper.jsonNodeToMap(node);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Singleton Access&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Get pre-configured singleton instance
+ * ObjectMapper mapper = JsonObjectMapper.get();
+ *
+ * // Get fresh default-configured mapper
+ * ObjectMapper fresh = JsonObjectMapper.getDefault();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see ObjectMapper
+ * @since 1.0.0
+ */
+public class JsonObjectMapper extends ObjectMapper {
+
+    private static final long serialVersionUID = 1L;
+
+    private static class ObjectMapperInstanceHolder {
+<span class="fc" id="L87">        static final ObjectMapper INSTANCE = getDefault();</span>
+    }
+
+<span class="fc" id="L90">    public JsonObjectMapper() {</span>
+<span class="fc" id="L91">        setVisibilityChecker(</span>
+<span class="fc" id="L92">                getVisibilityChecker().withVisibility(PropertyAccessor.FIELD, Visibility.ANY)</span>
+<span class="fc" id="L93">                        .withVisibility(PropertyAccessor.GETTER, Visibility.NONE).withVisibility(</span>
+                                PropertyAccessor.SETTER, Visibility.NONE
+                        ));
+<span class="fc" id="L96">        enable(SerializationFeature.INDENT_OUTPUT);</span>
+<span class="fc" id="L97">    }</span>
+
+    private static String toJsonString(Object model, boolean ident) {
+<span class="fc" id="L100">        ObjectMapper mapper = JsonObjectMapper.get();</span>
+        try {
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (ident)</span>
+<span class="fc" id="L103">                mapper.enable(SerializationFeature.INDENT_OUTPUT);</span>
+            //System.out.println(modelStr);
+<span class="fc" id="L105">            return mapper.writeValueAsString(model);</span>
+<span class="nc" id="L106">        } catch (JsonProcessingException e) {</span>
+<span class="nc" id="L107">            e.printStackTrace();</span>
+<span class="nc" id="L108">            return null;</span>
+        }
+    }
+
+    public static JsonNode getJsonNode(String json) {
+        try {
+<span class="fc" id="L114">            return JsonObjectMapper.get().readValue(json, JsonNode.class);</span>
+<span class="fc" id="L115">        } catch (IOException e) {</span>
+<span class="fc" id="L116">            e.printStackTrace();</span>
+        }
+<span class="fc" id="L118">        return null;</span>
+    }
+
+    public static Map&lt;String, Object&gt; jsonToMap(String json) {
+<span class="nc" id="L122">        return JsonObjectMapper.get().convertValue(json, new TypeReference&lt;Map&lt;String, Object&gt;&gt;() {</span>
+        });
+    }
+
+    public static Map&lt;String, Object&gt; jsonNodeToMap(JsonNode json) {
+<span class="fc" id="L127">        return JsonObjectMapper.get().convertValue(json, new TypeReference&lt;Map&lt;String, Object&gt;&gt;() {</span>
+        });
+    }
+
+    public static &lt;T&gt; T jsonToObject(String json, Class&lt;T&gt; type) {
+
+        try {
+<span class="fc" id="L134">            return JsonObjectMapper.getDefault().readValue(json, type);</span>
+<span class="nc" id="L135">        } catch (Exception e) {</span>
+<span class="nc" id="L136">            e.printStackTrace();</span>
+        }
+<span class="nc" id="L138">        return null;</span>
+    }
+
+    public static List&lt;Map&lt;String, Object&gt;&gt; jsonToListOfMap(String json) {
+<span class="fc" id="L142">        ObjectMapper mapper = JsonObjectMapper.getDefault();</span>
+        try {
+<span class="fc" id="L144">            return mapper.readValue(json, new TypeReference&lt;List&lt;Map&lt;String, Object&gt;&gt;&gt;() {</span>
+            });
+<span class="nc" id="L146">        } catch (Exception e) {</span>
+<span class="nc" id="L147">            e.printStackTrace();</span>
+        }
+<span class="nc" id="L149">        return null;</span>
+    }
+
+    public static String toJsonString(Object model) {
+<span class="fc" id="L153">        return toJsonString(model, true);</span>
+    }
+
+    public static String toJsonStringNoIdent(Object model) {
+<span class="fc" id="L157">        return toJsonString(model, false);</span>
+    }
+
+    public static ObjectMapper getDefault() {
+<span class="fc" id="L161">        ObjectMapper mapper = new ObjectMapper();</span>
+<span class="fc" id="L162">        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);</span>
+<span class="fc" id="L163">        mapper.disable(SerializationFeature.WRITE_NULL_MAP_VALUES);</span>
+<span class="fc" id="L164">        mapper.disable(SerializationFeature.WRITE_EMPTY_JSON_ARRAYS);</span>
+<span class="fc" id="L165">        mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);</span>
+        //SerializationConfig config = mapper.getSerializationConfig();
+        //config.withSerializationInclusion(Include.NON_EMPTY);
+        //config.withSerializationInclusion(Include.NON_NULL);
+<span class="fc" id="L169">        return mapper;</span>
+    }
+
+    public static ObjectMapper get() {
+<span class="fc" id="L173">        return ObjectMapperInstanceHolder.INSTANCE;</span>
+    }
+
+    public static Map&lt;String, Object&gt; parseResponse(HttpURLConnection connection) throws IOException {
+<span class="nc" id="L177">        try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {</span>
+<span class="nc" id="L178">            StringBuilder response = new StringBuilder();</span>
+            String line;
+<span class="nc bnc" id="L180" title="All 2 branches missed.">            while ((line = reader.readLine()) != null) {</span>
+<span class="nc" id="L181">                response.append(line);</span>
+            }
+<span class="nc" id="L183">            return get().readValue(response.toString(), new TypeReference&lt;Map&lt;String, Object&gt;&gt;() {});</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RequestSpec.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.request</a> &gt; <span class="el_source">RequestSpec.java</span></div><h1>RequestSpec.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.request;
+
+import com.guinetik.rr.http.RocketHeaders;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Immutable specification of an HTTP request containing all parameters needed for execution.
+ *
+ * &lt;p&gt;A {@code RequestSpec} encapsulates the complete definition of an API request including
+ * the endpoint, HTTP method, query parameters, headers, request body, and expected response type.
+ * Instances are created using the {@link RequestBuilder} fluent API.
+ *
+ * &lt;h2&gt;Request Components&lt;/h2&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;&lt;b&gt;Endpoint&lt;/b&gt; - The API path (relative or absolute URL)&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Method&lt;/b&gt; - HTTP method (GET, POST, PUT, DELETE, etc.)&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Query Parameters&lt;/b&gt; - URL query string parameters&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Headers&lt;/b&gt; - HTTP request headers via {@link RocketHeaders}&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Body&lt;/b&gt; - Request payload (for POST, PUT, PATCH)&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Response Type&lt;/b&gt; - Expected Java class for response deserialization&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;h2&gt;Creating Request Specifications&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Simple GET request
+ * RequestSpec&amp;lt;Void, User&amp;gt; getUser = RequestBuilder.&amp;lt;Void, User&amp;gt;get(&quot;/users/1&quot;)
+ *     .responseType(User.class)
+ *     .build();
+ *
+ * // POST request with body
+ * CreateUserRequest body = new CreateUserRequest(&quot;John&quot;, &quot;john@example.com&quot;);
+ * RequestSpec&amp;lt;CreateUserRequest, User&amp;gt; createUser = RequestBuilder
+ *     .&amp;lt;CreateUserRequest, User&amp;gt;post(&quot;/users&quot;)
+ *     .body(body)
+ *     .responseType(User.class)
+ *     .build();
+ *
+ * // GET with query parameters
+ * Map&amp;lt;String, String&amp;gt; params = new HashMap&amp;lt;&amp;gt;();
+ * params.put(&quot;page&quot;, &quot;1&quot;);
+ * params.put(&quot;limit&quot;, &quot;20&quot;);
+ * RequestSpec&amp;lt;Void, UserList&amp;gt; listUsers = RequestBuilder.&amp;lt;Void, UserList&amp;gt;get(&quot;/users&quot;)
+ *     .queryParams(params)
+ *     .responseType(UserList.class)
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Executing Requests&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // With synchronous client
+ * User user = client.sync().execute(getUser);
+ *
+ * // With async client
+ * CompletableFuture&amp;lt;User&amp;gt; future = client.async().execute(getUser);
+ *
+ * // With fluent client
+ * Result&amp;lt;User, ApiError&amp;gt; result = client.fluent().execute(getUser);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @param &lt;Req&gt; the type of the request body (use {@code Void} for requests without body)
+ * @param &lt;Res&gt; the type of the expected response
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see RequestBuilder
+ * @see RocketHeaders
+ * @since 1.0.0
+ */
+public class RequestSpec&lt;Req, Res&gt; {
+    private final String endpoint;
+    private final String method;
+    private final Map&lt;String, String&gt; queryParams;
+    private final RocketHeaders headers;
+    private final Req body;
+    private final Class&lt;Res&gt; responseType;
+
+    public RequestSpec(String endpoint, String method, Map&lt;String, String&gt; queryParams,
+<span class="fc" id="L78">                       RocketHeaders headers, Req body, Class&lt;Res&gt; responseType) {</span>
+<span class="fc" id="L79">        this.endpoint = endpoint;</span>
+<span class="fc" id="L80">        this.method = method;</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        this.queryParams = queryParams != null ? queryParams : new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        this.headers = headers != null ? headers : RocketHeaders.defaultJson();</span>
+<span class="fc" id="L83">        this.body = body;</span>
+<span class="fc" id="L84">        this.responseType = responseType;</span>
+<span class="fc" id="L85">    }</span>
+
+    public String getEndpoint() {
+<span class="fc" id="L88">        return endpoint;</span>
+    }
+
+    public String getMethod() {
+<span class="fc" id="L92">        return method;</span>
+    }
+
+    public Map&lt;String, String&gt; getQueryParams() {
+<span class="fc" id="L96">        return queryParams;</span>
+    }
+
+    public RocketHeaders getHeaders() {
+<span class="fc" id="L100">        return headers;</span>
+    }
+
+    public Req getBody() {
+<span class="fc" id="L104">        return body;</span>
+    }
+
+    public Class&lt;Res&gt; getResponseType() {
+<span class="fc" id="L108">        return responseType;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

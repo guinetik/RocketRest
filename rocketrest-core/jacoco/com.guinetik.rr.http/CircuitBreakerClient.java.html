@@ -1,0 +1,490 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CircuitBreakerClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.http</a> &gt; <span class="el_source">CircuitBreakerClient.java</span></div><h1>CircuitBreakerClient.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.http;
+
+import com.guinetik.rr.request.RequestSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.net.ssl.SSLContext;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
+
+/**
+ * Decorator that adds circuit breaker resilience pattern to any {@link RocketClient}.
+ *
+ * &lt;p&gt;The circuit breaker pattern prevents cascading failures by failing fast when a downstream
+ * service appears unhealthy. This gives the service time to recover without being overwhelmed
+ * by requests that are likely to fail.
+ *
+ * &lt;h2&gt;Circuit Breaker States&lt;/h2&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;&lt;b&gt;CLOSED&lt;/b&gt; - Normal operation, requests pass through&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;OPEN&lt;/b&gt; - Circuit is open, requests fail fast with {@link CircuitBreakerOpenException}&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;HALF_OPEN&lt;/b&gt; - Testing if service recovered, next request determines state&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;h2&gt;Basic Usage&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Wrap any RocketClient with circuit breaker
+ * RocketClient baseClient = new DefaultHttpClient(&quot;https://api.example.com&quot;);
+ * CircuitBreakerClient client = new CircuitBreakerClient(baseClient);
+ *
+ * try {
+ *     User user = client.execute(request);
+ * } catch (CircuitBreakerOpenException e) {
+ *     System.out.println(&quot;Service unavailable, retry after: &quot; +
+ *         e.getEstimatedMillisUntilReset() + &quot;ms&quot;);
+ * }
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Custom Configuration&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Circuit opens after 3 failures, resets after 60 seconds
+ * CircuitBreakerClient client = new CircuitBreakerClient(
+ *     baseClient,
+ *     3,      // failure threshold
+ *     60000   // reset timeout in ms
+ * );
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Via RocketClientFactory&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketClient client = RocketClientFactory.builder(&quot;https://api.example.com&quot;)
+ *     .withCircuitBreaker(5, 30000)
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see RocketClient
+ * @see CircuitBreakerOpenException
+ * @see RocketClientFactory
+ * @since 1.0.0
+ */
+public class CircuitBreakerClient implements RocketClient {
+<span class="fc" id="L71">    private static final Logger logger = LoggerFactory.getLogger(CircuitBreakerClient.class);</span>
+
+    /**
+     * Circuit breaker state
+     * @see HttpConstants.CircuitBreaker#STATUS_CLOSED
+     * @see HttpConstants.CircuitBreaker#STATUS_OPEN
+     * @see HttpConstants.CircuitBreaker#STATUS_HALF_OPEN
+     */
+<span class="fc" id="L79">    public enum State {</span>
+        /** Normal operation - {@link HttpConstants.CircuitBreaker#STATUS_CLOSED} */
+<span class="fc" id="L81">        CLOSED,</span>
+        /** Circuit is open, fast-fail - {@link HttpConstants.CircuitBreaker#STATUS_OPEN} */
+<span class="fc" id="L83">        OPEN,</span>
+        /** Testing if service is back - {@link HttpConstants.CircuitBreaker#STATUS_HALF_OPEN} */
+<span class="fc" id="L85">        HALF_OPEN</span>
+    }
+
+    /**
+     * Strategy for differentiating between failures
+     */
+<span class="fc" id="L91">    public enum FailurePolicy {</span>
+        /** Counts all exceptions as failures */
+<span class="fc" id="L93">        ALL_EXCEPTIONS,</span>
+        /** Only count status codes {@link HttpConstants.StatusCodes#SERVER_ERROR_MIN} (500) */
+<span class="fc" id="L95">        SERVER_ERRORS_ONLY,</span>
+        /** Exclude status codes in range {@link HttpConstants.StatusCodes#CLIENT_ERROR_MIN} (400) to 
+            {@link HttpConstants.StatusCodes#CLIENT_ERROR_MAX} (499) */
+<span class="fc" id="L98">        EXCLUDE_CLIENT_ERRORS,</span>
+        /** Use custom predicate */
+<span class="fc" id="L100">        CUSTOM</span>
+    }
+
+    private final RocketClient delegate;
+<span class="fc" id="L104">    private final AtomicReference&lt;State&gt; state = new AtomicReference&lt;&gt;(State.CLOSED);</span>
+<span class="fc" id="L105">    private final AtomicInteger failureCount = new AtomicInteger(0);</span>
+<span class="fc" id="L106">    private final AtomicLong lastFailureTime = new AtomicLong(0);</span>
+<span class="fc" id="L107">    private final AtomicLong lastResetTime = new AtomicLong(System.currentTimeMillis());</span>
+<span class="fc" id="L108">    private final AtomicBoolean halfOpenTestInProgress = new AtomicBoolean(false);</span>
+    private final int failureThreshold;
+    private final long resetTimeoutMs;
+    private final long failureDecayTimeMs;
+    private final FailurePolicy failurePolicy;
+    private final Predicate&lt;RocketRestException&gt; failurePredicate;
+    
+    // Metrics
+<span class="fc" id="L116">    private final AtomicInteger totalRequests = new AtomicInteger(0);</span>
+<span class="fc" id="L117">    private final AtomicInteger successfulRequests = new AtomicInteger(0);</span>
+<span class="fc" id="L118">    private final AtomicInteger failedRequests = new AtomicInteger(0);</span>
+<span class="fc" id="L119">    private final AtomicInteger rejectedRequests = new AtomicInteger(0);</span>
+<span class="fc" id="L120">    private final AtomicInteger circuitTrips = new AtomicInteger(0);</span>
+<span class="fc" id="L121">    private final Map&lt;Integer, AtomicInteger&gt; statusCodeCounts = new ConcurrentHashMap&lt;&gt;();</span>
+
+    /**
+     * Creates a circuit breaker with default settings
+     * 
+     * @param delegate The underlying client implementation
+     */
+    public CircuitBreakerClient(RocketClient delegate) {
+<span class="fc" id="L129">        this(delegate, </span>
+             HttpConstants.CircuitBreaker.DEFAULT_FAILURE_THRESHOLD,
+             HttpConstants.CircuitBreaker.DEFAULT_RESET_TIMEOUT_MS);
+<span class="fc" id="L132">    }</span>
+
+    /**
+     * Creates a circuit breaker with custom threshold and timeout
+     * 
+     * @param delegate The underlying client implementation
+     * @param failureThreshold Number of failures before opening circuit
+     * @param resetTimeoutMs Time in milliseconds before trying to close circuit
+     */
+    public CircuitBreakerClient(RocketClient delegate, int failureThreshold, long resetTimeoutMs) {
+<span class="fc" id="L142">        this(delegate, failureThreshold, resetTimeoutMs, </span>
+             HttpConstants.CircuitBreaker.DEFAULT_FAILURE_DECAY_TIME_MS,
+             FailurePolicy.ALL_EXCEPTIONS, null);
+<span class="fc" id="L145">    }</span>
+
+    /**
+     * Creates a fully customized circuit breaker
+     *
+     * @param delegate The underlying client implementation (must not be null)
+     * @param failureThreshold Number of failures before opening circuit
+     * @param resetTimeoutMs Time in milliseconds before trying to close circuit
+     * @param failureDecayTimeMs Time after which failure count starts to decay
+     * @param failurePolicy Strategy to determine what counts as a failure
+     * @param failurePredicate Custom predicate if policy is CUSTOM
+     * @throws NullPointerException if delegate is null
+     * @throws IllegalArgumentException if failureThreshold is less than 1 or timeouts are negative
+     */
+    public CircuitBreakerClient(RocketClient delegate, int failureThreshold, long resetTimeoutMs,
+                               long failureDecayTimeMs, FailurePolicy failurePolicy,
+<span class="fc" id="L161">                               Predicate&lt;RocketRestException&gt; failurePredicate) {</span>
+<span class="fc" id="L162">        this.delegate = Objects.requireNonNull(delegate, &quot;delegate must not be null&quot;);</span>
+
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (failureThreshold &lt; 1) {</span>
+<span class="fc" id="L165">            throw new IllegalArgumentException(&quot;failureThreshold must be at least 1&quot;);</span>
+        }
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (resetTimeoutMs &lt; 0) {</span>
+<span class="fc" id="L168">            throw new IllegalArgumentException(&quot;resetTimeoutMs must not be negative&quot;);</span>
+        }
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (failureDecayTimeMs &lt; 0) {</span>
+<span class="fc" id="L171">            throw new IllegalArgumentException(&quot;failureDecayTimeMs must not be negative&quot;);</span>
+        }
+
+<span class="fc" id="L174">        this.failureThreshold = failureThreshold;</span>
+<span class="fc" id="L175">        this.resetTimeoutMs = resetTimeoutMs;</span>
+<span class="fc" id="L176">        this.failureDecayTimeMs = failureDecayTimeMs;</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        this.failurePolicy = failurePolicy != null ? failurePolicy : FailurePolicy.ALL_EXCEPTIONS;</span>
+
+        // Set default predicate based on policy if not provided
+<span class="pc bpc" id="L180" title="3 of 4 branches missed.">        if (failurePolicy == FailurePolicy.CUSTOM &amp;&amp; failurePredicate != null) {</span>
+<span class="nc" id="L181">            this.failurePredicate = failurePredicate;</span>
+        } else {
+<span class="fc" id="L183">            this.failurePredicate = createDefaultPredicate(this.failurePolicy);</span>
+        }
+<span class="fc" id="L185">    }</span>
+
+    @Override
+    public &lt;Req, Res&gt; Res execute(RequestSpec&lt;Req, Res&gt; requestSpec) throws RocketRestException {
+        // Check for periodic decay reset
+<span class="fc" id="L190">        checkFailureDecay();</span>
+
+        // Track metrics
+<span class="fc" id="L193">        totalRequests.incrementAndGet();</span>
+
+        // Check circuit state and handle state transitions
+<span class="fc" id="L196">        State currentState = state.get();</span>
+<span class="fc" id="L197">        boolean isTestRequest = false;</span>
+
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (currentState == State.OPEN) {</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            if (System.currentTimeMillis() - lastFailureTime.get() &gt;= resetTimeoutMs) {</span>
+                // Try moving to HALF_OPEN
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">                if (state.compareAndSet(State.OPEN, State.HALF_OPEN)) {</span>
+<span class="fc" id="L203">                    logger.info(HttpConstants.CircuitBreaker.LOG_CIRCUIT_HALF_OPEN);</span>
+<span class="fc" id="L204">                    currentState = State.HALF_OPEN;</span>
+                } else {
+                    // Another thread transitioned the state, re-read it
+<span class="nc" id="L207">                    currentState = state.get();</span>
+                }
+            } else {
+                // Track rejected request metric
+<span class="fc" id="L211">                rejectedRequests.incrementAndGet();</span>
+
+                // Get time since last failure
+<span class="fc" id="L214">                long millisSinceFailure = System.currentTimeMillis() - lastFailureTime.get();</span>
+
+                // We're in OPEN state and the timeout hasn't elapsed, so fast-fail with circuit breaker exception
+<span class="fc" id="L217">                throw new CircuitBreakerOpenException(</span>
+                    HttpConstants.CircuitBreaker.CIRCUIT_OPEN,
+                    millisSinceFailure,
+                    resetTimeoutMs
+                );
+            }
+        }
+
+        // In HALF_OPEN state, only allow one test request at a time
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if (currentState == State.HALF_OPEN) {</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">            if (!halfOpenTestInProgress.compareAndSet(false, true)) {</span>
+                // Another thread is already testing, reject this request
+<span class="fc" id="L229">                logger.debug(HttpConstants.CircuitBreaker.LOG_HALF_OPEN_TEST_IN_PROGRESS);</span>
+<span class="fc" id="L230">                rejectedRequests.incrementAndGet();</span>
+
+<span class="fc" id="L232">                long millisSinceFailure = System.currentTimeMillis() - lastFailureTime.get();</span>
+<span class="fc" id="L233">                throw new CircuitBreakerOpenException(</span>
+                    HttpConstants.CircuitBreaker.CIRCUIT_OPEN,
+                    millisSinceFailure,
+                    resetTimeoutMs
+                );
+            }
+<span class="fc" id="L239">            isTestRequest = true;</span>
+        }
+
+        try {
+            // Execute the request with the delegate client
+<span class="fc" id="L244">            Res response = delegate.execute(requestSpec);</span>
+
+            // Success - reset circuit if needed (use compareAndSet to handle concurrent state changes)
+<span class="fc" id="L247">            State stateBeforeSuccess = state.get();</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            if (stateBeforeSuccess == State.HALF_OPEN) {</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">                if (state.compareAndSet(State.HALF_OPEN, State.CLOSED)) {</span>
+<span class="fc" id="L250">                    failureCount.set(0);</span>
+<span class="fc" id="L251">                    logger.info(HttpConstants.CircuitBreaker.LOG_CIRCUIT_CLOSED);</span>
+                }
+            }
+
+            // Track metrics
+<span class="fc" id="L256">            successfulRequests.incrementAndGet();</span>
+
+<span class="fc" id="L258">            return response;</span>
+<span class="fc" id="L259">        } catch (RocketRestException e) {</span>
+            // Track all failures in metrics
+<span class="fc" id="L261">            failedRequests.incrementAndGet();</span>
+
+            // Track status code in metrics if available
+<span class="fc" id="L264">            int statusCode = e.getStatusCode();</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">            if (statusCode &gt; 0) {</span>
+<span class="fc" id="L266">                statusCodeCounts.computeIfAbsent(statusCode, code -&gt; new AtomicInteger(0))</span>
+<span class="fc" id="L267">                                .incrementAndGet();</span>
+            }
+
+            // Handle failure according to policy
+<span class="fc" id="L271">            boolean isCountableFailure = shouldCountAsFailure(e);</span>
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">            if (isCountableFailure) {</span>
+<span class="fc" id="L273">                handleFailure(e);</span>
+            }
+
+            // Check if we just opened the circuit from this failure
+            // Re-read state to get current value, not stale snapshot
+<span class="fc" id="L278">            State currentStateAfterFailure = state.get();</span>
+<span class="pc bpc" id="L279" title="1 of 6 branches missed.">            if (isCountableFailure &amp;&amp; currentState == State.CLOSED &amp;&amp; currentStateAfterFailure == State.OPEN) {</span>
+<span class="fc" id="L280">                throw new CircuitBreakerOpenException(</span>
+<span class="fc" id="L281">                    &quot;Circuit opened due to failure: &quot; + e.getMessage(),</span>
+                    e,
+                    0,  // Just opened, so 0 time since failure
+                    resetTimeoutMs
+                );
+            }
+
+            // Otherwise rethrow the original exception
+<span class="fc" id="L289">            throw e;</span>
+        } finally {
+            // Always release the test lock if we acquired it
+<span class="fc bfc" id="L292" title="All 2 branches covered.">            if (isTestRequest) {</span>
+<span class="fc" id="L293">                halfOpenTestInProgress.set(false);</span>
+            }
+        }
+    }
+    
+    /**
+     * Performs a health check by trying to execute the given request.
+     * This can be used to manually test if the service is healthy.
+     * &lt;p&gt;
+     * Note: This method bypasses the normal circuit breaker flow and directly
+     * executes the request against the delegate. It's intended for external
+     * health monitoring systems.
+     *
+     * @param &lt;Req&gt; Request type
+     * @param &lt;Res&gt; Response type
+     * @param healthCheckRequest The request to use as a health check
+     * @return true if the service is healthy
+     */
+    public &lt;Req, Res&gt; boolean performHealthCheck(RequestSpec&lt;Req, Res&gt; healthCheckRequest) {
+        try {
+<span class="nc" id="L313">            delegate.execute(healthCheckRequest);</span>
+
+            // If we get here, service is healthy, close circuit
+<span class="nc" id="L316">            State currentState = state.get();</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">            if (currentState != State.CLOSED) {</span>
+<span class="nc" id="L318">                state.set(State.CLOSED);</span>
+<span class="nc" id="L319">                failureCount.set(0);</span>
+<span class="nc" id="L320">                halfOpenTestInProgress.set(false);</span>
+<span class="nc" id="L321">                logger.info(HttpConstants.CircuitBreaker.LOG_CIRCUIT_CLOSED);</span>
+            }
+
+<span class="nc" id="L324">            return true;</span>
+<span class="nc" id="L325">        } catch (RocketRestException e) {</span>
+            // Service still failing
+<span class="nc bnc" id="L327" title="All 2 branches missed.">            if (state.get() == State.HALF_OPEN) {</span>
+<span class="nc" id="L328">                state.set(State.OPEN);</span>
+<span class="nc" id="L329">                lastFailureTime.set(System.currentTimeMillis());</span>
+<span class="nc" id="L330">                halfOpenTestInProgress.set(false);</span>
+<span class="nc" id="L331">                logger.warn(HttpConstants.CircuitBreaker.LOG_TEST_FAILED);</span>
+            }
+
+<span class="nc" id="L334">            return false;</span>
+        }
+    }
+
+    /**
+     * Manually resets the circuit to closed state.
+     * This also resets all internal state including failure counts and test flags.
+     */
+    public void resetCircuit() {
+<span class="fc" id="L343">        state.set(State.CLOSED);</span>
+<span class="fc" id="L344">        failureCount.set(0);</span>
+<span class="fc" id="L345">        halfOpenTestInProgress.set(false);</span>
+<span class="fc" id="L346">        logger.info(HttpConstants.CircuitBreaker.LOG_CIRCUIT_CLOSED + &quot; (manual reset)&quot;);</span>
+<span class="fc" id="L347">    }</span>
+    
+    /**
+     * Gets current circuit breaker state
+     * 
+     * @return Current state (OPEN, CLOSED, HALF_OPEN)
+     */
+    public State getState() {
+<span class="fc" id="L355">        return state.get();</span>
+    }
+    
+    /**
+     * Gets current failure count
+     * 
+     * @return Current failure count
+     */
+    public int getFailureCount() {
+<span class="fc" id="L364">        return failureCount.get();</span>
+    }
+    
+    /**
+     * Gets circuit breaker metrics
+     * 
+     * @return Map of metric name to value
+     */
+    public Map&lt;String, Object&gt; getMetrics() {
+<span class="fc" id="L373">        Map&lt;String, Object&gt; metrics = new HashMap&lt;&gt;();</span>
+        
+        // Basic metrics
+<span class="fc" id="L376">        metrics.put(&quot;state&quot;, getStateAsString());</span>
+<span class="fc" id="L377">        metrics.put(&quot;failureCount&quot;, failureCount.get());</span>
+<span class="fc" id="L378">        metrics.put(&quot;failureThreshold&quot;, failureThreshold);</span>
+<span class="fc" id="L379">        metrics.put(&quot;totalRequests&quot;, totalRequests.get());</span>
+<span class="fc" id="L380">        metrics.put(&quot;successfulRequests&quot;, successfulRequests.get());</span>
+<span class="fc" id="L381">        metrics.put(&quot;failedRequests&quot;, failedRequests.get());</span>
+<span class="fc" id="L382">        metrics.put(&quot;rejectedRequests&quot;, rejectedRequests.get());</span>
+<span class="fc" id="L383">        metrics.put(&quot;circuitTrips&quot;, circuitTrips.get());</span>
+<span class="fc" id="L384">        metrics.put(&quot;halfOpenTestInProgress&quot;, halfOpenTestInProgress.get());</span>
+        
+        // Add status code counts
+<span class="fc" id="L387">        Map&lt;String, Integer&gt; statusCounts = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L388">        statusCodeCounts.forEach((code, count) -&gt; statusCounts.put(code.toString(), count.get()));</span>
+<span class="fc" id="L389">        metrics.put(&quot;statusCodes&quot;, statusCounts);</span>
+        
+        // Time metrics
+<span class="fc" id="L392">        long lastFailure = lastFailureTime.get();</span>
+<span class="fc bfc" id="L393" title="All 2 branches covered.">        if (lastFailure &gt; 0) {</span>
+<span class="fc" id="L394">            metrics.put(&quot;millisSinceLastFailure&quot;, System.currentTimeMillis() - lastFailure);</span>
+        }
+        
+<span class="fc" id="L397">        return Collections.unmodifiableMap(metrics);</span>
+    }
+    
+    /**
+     * Gets the state as a string constant
+     * 
+     * @return State as a string defined in HttpConstants
+     */
+    private String getStateAsString() {
+<span class="pc bpc" id="L406" title="2 of 4 branches missed.">        switch (state.get()) {</span>
+            case OPEN:
+<span class="fc" id="L408">                return HttpConstants.CircuitBreaker.STATUS_OPEN;</span>
+            case CLOSED:
+<span class="fc" id="L410">                return HttpConstants.CircuitBreaker.STATUS_CLOSED;</span>
+            case HALF_OPEN:
+<span class="nc" id="L412">                return HttpConstants.CircuitBreaker.STATUS_HALF_OPEN;</span>
+            default:
+<span class="nc" id="L414">                return state.get().toString();</span>
+        }
+    }
+
+    private void handleFailure(RocketRestException e) {
+<span class="fc bfc" id="L419" title="All 2 branches covered.">        if (state.get() == State.HALF_OPEN) {</span>
+            // Failed during test request
+<span class="fc" id="L421">            state.set(State.OPEN);</span>
+<span class="fc" id="L422">            lastFailureTime.set(System.currentTimeMillis());</span>
+<span class="fc" id="L423">            logger.warn(HttpConstants.CircuitBreaker.LOG_TEST_FAILED);</span>
+<span class="fc" id="L424">            return;</span>
+        }
+
+<span class="fc" id="L427">        int currentFailures = failureCount.incrementAndGet();</span>
+<span class="pc bpc" id="L428" title="1 of 4 branches missed.">        if (currentFailures &gt;= failureThreshold &amp;&amp; state.compareAndSet(State.CLOSED, State.OPEN)) {</span>
+<span class="fc" id="L429">            lastFailureTime.set(System.currentTimeMillis());</span>
+<span class="fc" id="L430">            logger.warn(HttpConstants.CircuitBreaker.LOG_CIRCUIT_OPENED, currentFailures);</span>
+<span class="fc" id="L431">            circuitTrips.incrementAndGet();</span>
+        }
+<span class="fc" id="L433">    }</span>
+    
+    /**
+     * Checks if it's time to decay the failure count
+     */
+    private void checkFailureDecay() {
+<span class="fc" id="L439">        long now = System.currentTimeMillis();</span>
+<span class="fc" id="L440">        long lastReset = lastResetTime.get();</span>
+        
+        // If we're in CLOSED state and decay time has passed, reset failure count
+<span class="pc bpc" id="L443" title="1 of 6 branches missed.">        if (state.get() == State.CLOSED &amp;&amp; failureCount.get() &gt; 0 &amp;&amp; </span>
+                (now - lastReset) &gt;= failureDecayTimeMs) {
+<span class="nc bnc" id="L445" title="All 2 branches missed.">            if (failureCount.getAndSet(0) &gt; 0) {</span>
+<span class="nc" id="L446">                logger.debug(HttpConstants.CircuitBreaker.LOG_DECAY_RESET);</span>
+            }
+<span class="nc" id="L448">            lastResetTime.set(now);</span>
+        }
+<span class="fc" id="L450">    }</span>
+    
+    /**
+     * Creates appropriate failure predicate based on policy
+     */
+    private Predicate&lt;RocketRestException&gt; createDefaultPredicate(FailurePolicy policy) {
+<span class="pc bpc" id="L456" title="1 of 3 branches missed.">        switch (policy) {</span>
+            case SERVER_ERRORS_ONLY:
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">                return e -&gt; e.getStatusCode() &gt;= HttpConstants.StatusCodes.SERVER_ERROR_MIN &amp;&amp;</span>
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">                            e.getStatusCode() &lt;= HttpConstants.StatusCodes.SERVER_ERROR_MAX;</span>
+            case EXCLUDE_CLIENT_ERRORS:
+<span class="nc bnc" id="L461" title="All 2 branches missed.">                return e -&gt; e.getStatusCode() &lt; HttpConstants.StatusCodes.CLIENT_ERROR_MIN || </span>
+<span class="nc bnc" id="L462" title="All 2 branches missed.">                            e.getStatusCode() &gt; HttpConstants.StatusCodes.CLIENT_ERROR_MAX;</span>
+            case ALL_EXCEPTIONS:
+            default:
+<span class="fc" id="L465">                return e -&gt; true;</span>
+        }
+    }
+    
+    /**
+     * Determines if an exception should count toward failure threshold based on policy
+     */
+    private boolean shouldCountAsFailure(RocketRestException e) {
+<span class="fc" id="L473">        return failurePredicate.test(e);</span>
+    }
+
+    @Override
+    public void configureSsl(SSLContext sslContext) {
+<span class="nc" id="L478">        delegate.configureSsl(sslContext);</span>
+<span class="nc" id="L479">    }</span>
+
+    @Override
+    public void setBaseUrl(String baseUrl) {
+<span class="nc" id="L483">        this.delegate.setBaseUrl(baseUrl);</span>
+<span class="nc" id="L484">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

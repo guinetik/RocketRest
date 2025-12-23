@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApiError.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.result</a> &gt; <span class="el_source">ApiError.java</span></div><h1>ApiError.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.result;
+
+/**
+ * Represents an API error in the {@link Result} pattern.
+ *
+ * &lt;p&gt;This class encapsulates information about API errors without using exceptions,
+ * providing a functional approach to error handling. It includes the error message,
+ * HTTP status code (when applicable), response body, and error type classification.
+ *
+ * &lt;h2&gt;Error Types&lt;/h2&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@link ErrorType#HTTP_ERROR} - Server returned an error status code&lt;/li&gt;
+ *   &lt;li&gt;{@link ErrorType#NETWORK_ERROR} - Connection or network failure&lt;/li&gt;
+ *   &lt;li&gt;{@link ErrorType#PARSE_ERROR} - Failed to parse response body&lt;/li&gt;
+ *   &lt;li&gt;{@link ErrorType#AUTH_ERROR} - Authentication/authorization failure&lt;/li&gt;
+ *   &lt;li&gt;{@link ErrorType#CONFIG_ERROR} - Client misconfiguration&lt;/li&gt;
+ *   &lt;li&gt;{@link ErrorType#CIRCUIT_OPEN} - Circuit breaker is open&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;h2&gt;Creating Errors&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // HTTP error with status code
+ * ApiError notFound = ApiError.httpError(&quot;User not found&quot;, 404, responseBody);
+ *
+ * // Network error
+ * ApiError networkError = ApiError.networkError(&quot;Connection refused&quot;);
+ *
+ * // Parse error
+ * ApiError parseError = ApiError.parseError(&quot;Invalid JSON&quot;, responseBody);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Handling Errors&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * Result&amp;lt;User, ApiError&amp;gt; result = client.fluent().get(&quot;/users/1&quot;, User.class);
+ *
+ * result.ifFailure(error -&amp;gt; {
+ *     if (error.isType(ErrorType.HTTP_ERROR)) {
+ *         if (error.hasStatusCode(404)) {
+ *             System.out.println(&quot;User not found&quot;);
+ *         } else if (error.hasStatusCode(500)) {
+ *             System.out.println(&quot;Server error&quot;);
+ *         }
+ *     } else if (error.isType(ErrorType.NETWORK_ERROR)) {
+ *         System.out.println(&quot;Check your connection&quot;);
+ *     }
+ * });
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see Result
+ * @see com.guinetik.rr.api.FluentApiClient
+ * @since 1.0.0
+ */
+public class ApiError {
+    private final String message;
+    private final int statusCode;
+    private final String responseBody;
+    private final ErrorType errorType;
+
+    /**
+     * Enum representing different types of errors that can occur.
+     */
+<span class="fc" id="L63">    public enum ErrorType {</span>
+        /** HTTP error from server */
+<span class="fc" id="L65">        HTTP_ERROR,</span>
+        
+        /** Network connectivity error */
+<span class="fc" id="L68">        NETWORK_ERROR,</span>
+        
+        /** Error parsing response */
+<span class="fc" id="L71">        PARSE_ERROR,</span>
+        
+        /** Authentication/authorization error */
+<span class="fc" id="L74">        AUTH_ERROR,</span>
+        
+        /** Client configuration error */
+<span class="fc" id="L77">        CONFIG_ERROR,</span>
+        
+        /** Circuit breaker is open */
+<span class="fc" id="L80">        CIRCUIT_OPEN,</span>
+        
+        /** Unknown error */
+<span class="fc" id="L83">        UNKNOWN</span>
+    }
+
+    /**
+     * Constructs a new ApiError with the specified parameters.
+     * 
+     * @param message Error message
+     * @param statusCode HTTP status code (may be 0 for non-HTTP errors)
+     * @param responseBody Response body or null if not available
+     * @param errorType Type of error that occurred
+     */
+<span class="fc" id="L94">    public ApiError(String message, int statusCode, String responseBody, ErrorType errorType) {</span>
+<span class="fc" id="L95">        this.message = message;</span>
+<span class="fc" id="L96">        this.statusCode = statusCode;</span>
+<span class="fc" id="L97">        this.responseBody = responseBody;</span>
+<span class="fc" id="L98">        this.errorType = errorType;</span>
+<span class="fc" id="L99">    }</span>
+
+    /**
+     * Constructs an HTTP error with status code.
+     * 
+     * @param message Error message
+     * @param statusCode HTTP status code
+     * @param responseBody Response body
+     * @return A new ApiError representing an HTTP error
+     */
+    public static ApiError httpError(String message, int statusCode, String responseBody) {
+<span class="fc" id="L110">        return new ApiError(message, statusCode, responseBody, ErrorType.HTTP_ERROR);</span>
+    }
+
+    /**
+     * Constructs a network error.
+     * 
+     * @param message Error message
+     * @return A new ApiError representing a network error
+     */
+    public static ApiError networkError(String message) {
+<span class="fc" id="L120">        return new ApiError(message, 0, null, ErrorType.NETWORK_ERROR);</span>
+    }
+
+    /**
+     * Constructs a parse error.
+     * 
+     * @param message Error message
+     * @param responseBody The response that couldn't be parsed
+     * @return A new ApiError representing a parse error
+     */
+    public static ApiError parseError(String message, String responseBody) {
+<span class="fc" id="L131">        return new ApiError(message, 0, responseBody, ErrorType.PARSE_ERROR);</span>
+    }
+
+    /**
+     * Constructs an authentication error.
+     * 
+     * @param message Error message
+     * @param statusCode HTTP status code (typically 401)
+     * @param responseBody Response body
+     * @return A new ApiError representing an authentication error
+     */
+    public static ApiError authError(String message, int statusCode, String responseBody) {
+<span class="fc" id="L143">        return new ApiError(message, statusCode, responseBody, ErrorType.AUTH_ERROR);</span>
+    }
+
+    /**
+     * Constructs a configuration error.
+     * 
+     * @param message Error message
+     * @return A new ApiError representing a configuration error
+     */
+    public static ApiError configError(String message) {
+<span class="fc" id="L153">        return new ApiError(message, 0, null, ErrorType.CONFIG_ERROR);</span>
+    }
+
+    /**
+     * Constructs a circuit breaker open error.
+     * 
+     * @param message Error message
+     * @return A new ApiError representing a circuit breaker open error
+     */
+    public static ApiError circuitOpenError(String message) {
+<span class="fc" id="L163">        return new ApiError(message, 0, null, ErrorType.CIRCUIT_OPEN);</span>
+    }
+
+    /**
+     * Gets the error message.
+     * 
+     * @return The error message
+     */
+    public String getMessage() {
+<span class="fc" id="L172">        return message;</span>
+    }
+
+    /**
+     * Gets the HTTP status code.
+     * 
+     * @return The HTTP status code, or 0 if not applicable
+     */
+    public int getStatusCode() {
+<span class="fc" id="L181">        return statusCode;</span>
+    }
+
+    /**
+     * Gets the response body.
+     * 
+     * @return The response body, or null if not available
+     */
+    public String getResponseBody() {
+<span class="fc" id="L190">        return responseBody;</span>
+    }
+
+    /**
+     * Gets the error type.
+     * 
+     * @return The error type
+     */
+    public ErrorType getErrorType() {
+<span class="fc" id="L199">        return errorType;</span>
+    }
+
+    /**
+     * Checks if this error is of the specified type.
+     * 
+     * @param type The error type to check
+     * @return true if this error is of the specified type, false otherwise
+     */
+    public boolean isType(ErrorType type) {
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        return this.errorType == type;</span>
+    }
+
+    /**
+     * Checks if this error is an HTTP error with the specified status code.
+     * 
+     * @param statusCode The HTTP status code to check
+     * @return true if this error is an HTTP error with the specified status code
+     */
+    public boolean hasStatusCode(int statusCode) {
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        return this.statusCode == statusCode;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L224">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L225">        sb.append(errorType).append(&quot;: &quot;).append(message);</span>
+        
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (statusCode &gt; 0) {</span>
+<span class="fc" id="L228">            sb.append(&quot; (Status: &quot;).append(statusCode).append(&quot;)&quot;);</span>
+        }
+        
+<span class="fc" id="L231">        return sb.toString();</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

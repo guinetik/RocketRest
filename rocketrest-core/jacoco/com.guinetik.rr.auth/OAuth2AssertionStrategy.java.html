@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OAuth2AssertionStrategy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.auth</a> &gt; <span class="el_source">OAuth2AssertionStrategy.java</span></div><h1>OAuth2AssertionStrategy.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.auth;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Authentication strategy that implements OAuth 2.0 assertion flow.
+ * This strategy implements a two-step OAuth flow:
+ * 1. Get an assertion from the Identity Provider endpoint by providing a private key;
+ * 2. Use the assertion to get the actual OAuth token from the token endpoint.
+ * This can be used with various identity providers like SAP, Azure AD, Okta, etc.
+ */
+public class OAuth2AssertionStrategy extends AbstractOAuth2Strategy {
+
+<span class="fc" id="L19">    private static final Logger logger = LoggerFactory.getLogger(OAuth2AssertionStrategy.class);</span>
+
+    private final String clientId;
+    private final String userId;
+    private final String privateKey;
+    private final String companyId;
+    private final String grantType;
+    private final String assertionUrl;
+    private final String tokenUrl;
+    private final Map&lt;String, String&gt; additionalAssertionParams;
+
+    /**
+     * Creates a new OAuth 2.0 assertion strategy.
+     *
+     * @param clientId       the OAuth client ID
+     * @param userId         the user ID
+     * @param privateKey     the private key for assertion
+     * @param companyId      the company ID (optional, can be null)
+     * @param grantType      the OAuth grant type
+     * @param assertionUrl   the assertion endpoint URL
+     * @param tokenUrl       the token endpoint URL
+     */
+    public OAuth2AssertionStrategy(String clientId, String userId, String privateKey, 
+                          String companyId, String grantType, String assertionUrl, String tokenUrl) {
+<span class="fc" id="L43">        this(clientId, userId, privateKey, companyId, grantType, assertionUrl, tokenUrl, </span>
+             new HashMap&lt;&gt;(), new HashMap&lt;&gt;());
+<span class="fc" id="L45">    }</span>
+
+    /**
+     * Creates a new OAuth 2.0 assertion strategy with additional parameters.
+     *
+     * @param clientId                 the OAuth client ID
+     * @param userId                   the user ID
+     * @param privateKey               the private key for assertion
+     * @param companyId                the company ID (optional, can be null)
+     * @param grantType                the OAuth grant type
+     * @param assertionUrl             the assertion endpoint URL
+     * @param tokenUrl                 the token endpoint URL
+     * @param additionalAssertionParams additional parameters for assertion request
+     * @param additionalTokenParams    additional parameters for token request
+     */
+    public OAuth2AssertionStrategy(String clientId, String userId, String privateKey, 
+                          String companyId, String grantType, String assertionUrl, String tokenUrl,
+                          Map&lt;String, String&gt; additionalAssertionParams,
+                          Map&lt;String, String&gt; additionalTokenParams) {
+<span class="fc" id="L64">        super(tokenUrl, additionalTokenParams);</span>
+<span class="fc" id="L65">        this.clientId = clientId;</span>
+<span class="fc" id="L66">        this.userId = userId;</span>
+<span class="fc" id="L67">        this.privateKey = privateKey;</span>
+<span class="fc" id="L68">        this.companyId = companyId;</span>
+<span class="fc" id="L69">        this.grantType = grantType;</span>
+<span class="fc" id="L70">        this.assertionUrl = assertionUrl;</span>
+<span class="fc" id="L71">        this.tokenUrl = tokenUrl;</span>
+<span class="fc" id="L72">        this.additionalAssertionParams = additionalAssertionParams;</span>
+<span class="fc" id="L73">    }</span>
+
+    @Override
+    public AuthType getType() {
+<span class="fc" id="L77">        return AuthType.OAUTH_ASSERTION;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     * @throws TokenRefreshException if any of the required parameters (clientId, userId, privateKey,
+     * grantType, assertionUrl, or tokenUrl) are missing.
+     */
+    @Override
+    protected void validateCredentials() {
+<span class="pc bpc" id="L87" title="6 of 12 branches missed.">        if (clientId == null || userId == null || privateKey == null || </span>
+            grantType == null || assertionUrl == null || tokenUrl == null) {
+<span class="nc" id="L89">            throw new TokenRefreshException(&quot;Required credentials are missing for OAuth 2.0 assertion flow&quot;);</span>
+        }
+<span class="fc" id="L91">    }</span>
+
+    /**
+     * {@inheritDoc}
+     * &lt;p&gt;
+     * This implementation handles the two-step OAuth 2.0 assertion flow:
+     * &lt;ol&gt;
+     *   &lt;li&gt;It first calls {@link #getAssertion()} to obtain an assertion from the configured assertion URL.&lt;/li&gt;
+     *   &lt;li&gt;Then, it uses this assertion along with other parameters (clientId, userId, grantType, companyId if present)
+     *       to call the {@code super.refreshCredentials()} method, which performs the actual token request
+     *       to the configured token URL.&lt;/li&gt;
+     * &lt;/ol&gt;
+     *
+     * @return {@code true} if the token was successfully refreshed, {@code false} otherwise.
+     * @throws TokenRefreshException if token refresh fails at any step.
+     */
+    @Override
+    public boolean refreshCredentials() {
+        try {
+            // Step 1: Get assertion from the assertion endpoint
+<span class="fc" id="L111">            String assertion = getAssertion();</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            if (assertion.isEmpty()) {</span>
+<span class="fc" id="L113">                logger.error(&quot;Failed to get assertion from assertion endpoint&quot;);</span>
+<span class="fc" id="L114">                return false;</span>
+            }
+            // Step 2: Get token using assertion and the parent class functionality
+            // Prepare token parameters including the assertion we just got
+<span class="nc" id="L118">            additionalParams.put(&quot;client_id&quot;, clientId);</span>
+<span class="nc" id="L119">            additionalParams.put(&quot;user_id&quot;, userId);</span>
+<span class="nc" id="L120">            additionalParams.put(&quot;grant_type&quot;, grantType);</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">            if (companyId != null) {</span>
+<span class="nc" id="L122">                additionalParams.put(&quot;company_id&quot;, companyId);</span>
+            }
+<span class="nc" id="L124">            additionalParams.put(&quot;assertion&quot;, assertion);</span>
+            // Call the parent implementation to get the token
+<span class="nc" id="L126">            return super.refreshCredentials();</span>
+<span class="fc" id="L127">        } catch (Exception e) {</span>
+<span class="fc" id="L128">            logger.error(&quot;Failed to refresh token&quot;, e);</span>
+<span class="fc" id="L129">            throw new TokenRefreshException(&quot;Failed to refresh token: &quot; + e.getMessage());</span>
+        }
+    }
+
+    /**
+     * Retrieves an assertion token from the configured assertion URL.
+     * This method makes a POST request to the {@code assertionUrl} using parameters such as
+     * clientId, userId, the privateKey, and the target tokenUrl.
+     *
+     * @return The assertion string obtained from the endpoint.
+     * @throws IOException if an I/O error occurs during the request to the assertion endpoint.
+     * @throws TokenRefreshException if the assertion endpoint returns an error or an empty assertion.
+     */
+    private String getAssertion() throws IOException {
+<span class="fc" id="L143">        Map&lt;String, String&gt; assertionParams = new HashMap&lt;&gt;(additionalAssertionParams);</span>
+<span class="fc" id="L144">        assertionParams.put(&quot;client_id&quot;, clientId);</span>
+<span class="fc" id="L145">        assertionParams.put(&quot;user_id&quot;, userId);</span>
+<span class="fc" id="L146">        assertionParams.put(&quot;token_url&quot;, tokenUrl);</span>
+<span class="fc" id="L147">        assertionParams.put(&quot;private_key&quot;, privateKey);</span>
+
+        // Make the request to the assertion endpoint using the parent class's POST method
+        try {
+<span class="fc" id="L151">            return post(assertionUrl, assertionParams).trim();</span>
+<span class="fc" id="L152">        } catch (Exception e) {</span>
+<span class="fc" id="L153">            logger.error(&quot;Error getting assertion&quot;, e);</span>
+<span class="fc" id="L154">            throw new IOException(&quot;Error getting assertion: &quot; + e.getMessage(), e);</span>
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     * &lt;p&gt;
+     * Prepares parameters for the token request part of the assertion flow.
+     * This method is typically called by the parent class's {@code refreshToken} method.
+     * It includes clientId, userId, grantType, and companyId (if available).
+     * The assertion itself is expected to have been added to {@code additionalParams} by the
+     * overridden {@link #refreshCredentials()} method before this is called.
+     */
+    @Override
+    protected Map&lt;String, String&gt; prepareTokenRequestParams() {
+        // This method is called by the parent class's refreshToken method
+<span class="fc" id="L170">        Map&lt;String, String&gt; params = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L171">        params.put(&quot;client_id&quot;, clientId);</span>
+<span class="fc" id="L172">        params.put(&quot;user_id&quot;, userId);</span>
+<span class="fc" id="L173">        params.put(&quot;grant_type&quot;, grantType);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (companyId != null) {</span>
+<span class="fc" id="L175">            params.put(&quot;company_id&quot;, companyId);</span>
+        }
+        // The assertion should be in additionalParams at this point        
+<span class="fc" id="L178">        return params;</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

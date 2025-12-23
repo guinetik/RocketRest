@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AsyncHttpClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.http</a> &gt; <span class="el_source">AsyncHttpClient.java</span></div><h1>AsyncHttpClient.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.http;
+
+import com.guinetik.rr.RocketRestOptions;
+import com.guinetik.rr.request.RequestSpec;
+
+import javax.net.ssl.SSLContext;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+
+/**
+ * Asynchronous HTTP client that executes requests on a dedicated thread pool.
+ *
+ * &lt;p&gt;This client wraps any synchronous {@link RocketClient} implementation and provides
+ * non-blocking request execution via {@link java.util.concurrent.CompletableFuture}.
+ *
+ * &lt;h2&gt;Features&lt;/h2&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;Non-blocking request execution with CompletableFuture&lt;/li&gt;
+ *   &lt;li&gt;Configurable thread pool size&lt;/li&gt;
+ *   &lt;li&gt;Wraps any RocketClient implementation&lt;/li&gt;
+ *   &lt;li&gt;Proper exception propagation via CompletionException&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;h2&gt;Basic Usage&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * ExecutorService executor = Executors.newFixedThreadPool(4);
+ * AsyncHttpClient asyncClient = new AsyncHttpClient(
+ *     &quot;https://api.example.com&quot;,
+ *     executor
+ * );
+ *
+ * // Execute async request
+ * CompletableFuture&amp;lt;User&amp;gt; future = asyncClient.executeAsync(request);
+ *
+ * // Handle result when ready
+ * future.thenAccept(user -&amp;gt; System.out.println(&quot;Got: &quot; + user.getName()))
+ *       .exceptionally(ex -&amp;gt; {
+ *           System.err.println(&quot;Failed: &quot; + ex.getMessage());
+ *           return null;
+ *       });
+ *
+ * // Don't forget to shutdown
+ * asyncClient.shutdown();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Via RocketRest&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketRest client = new RocketRest(config);
+ *
+ * client.async().get(&quot;/users/1&quot;, User.class)
+ *     .thenAccept(user -&amp;gt; System.out.println(user));
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see RocketClient
+ * @see RocketClientFactory
+ * @see com.guinetik.rr.RocketRest#async()
+ * @since 1.0.0
+ */
+public class AsyncHttpClient implements RocketClient {
+
+    private final RocketClient delegate;
+    private final ExecutorService executor;
+
+    /**
+     * Creates a new AsyncHttpClient with the specified delegate client and executor.
+     *
+     * @param delegate The underlying HTTP client to delegate requests to
+     * @param executor The executor service to run requests on
+     */
+<span class="fc" id="L72">    public AsyncHttpClient(RocketClient delegate, ExecutorService executor) {</span>
+<span class="fc" id="L73">        this.delegate = delegate;</span>
+<span class="fc" id="L74">        this.executor = executor;</span>
+<span class="fc" id="L75">    }</span>
+
+    /**
+     * Creates a new AsyncHttpClient with a DefaultHttpClient as the delegate.
+     *
+     * @param baseUrl  The base URL for API requests
+     * @param executor The executor service to run requests on
+     */
+    public AsyncHttpClient(String baseUrl, ExecutorService executor) {
+<span class="nc" id="L84">        this(new DefaultHttpClient(baseUrl), executor);</span>
+<span class="nc" id="L85">    }</span>
+
+    /**
+     * Creates a new AsyncHttpClient with a DefaultHttpClient as the delegate and client options.
+     *
+     * @param baseUrl       The base URL for API requests
+     * @param clientOptions The client options
+     * @param executor      The executor service to run requests on
+     */
+    public AsyncHttpClient(String baseUrl, RocketRestOptions clientOptions, ExecutorService executor) {
+<span class="nc" id="L95">        this(new DefaultHttpClient(baseUrl, clientOptions), executor);</span>
+<span class="nc" id="L96">    }</span>
+
+    @Override
+    public void configureSsl(SSLContext sslContext) {
+<span class="nc" id="L100">        delegate.configureSsl(sslContext);</span>
+<span class="nc" id="L101">    }</span>
+
+    @Override
+    public void setBaseUrl(String baseUrl) {
+<span class="fc" id="L105">        this.delegate.setBaseUrl(baseUrl);</span>
+<span class="fc" id="L106">    }</span>
+
+    @Override
+    public &lt;Req, Res&gt; Res execute(RequestSpec&lt;Req, Res&gt; requestSpec) throws RocketRestException {
+        // This method is generally not used directly with AsyncHttpClient,
+        // but it's implemented for HTTP client interface compatibility
+<span class="nc" id="L112">        return delegate.execute(requestSpec);</span>
+    }
+
+    /**
+     * Executes an HTTP request asynchronously.
+     *
+     * @param &lt;Req&gt;       The type of the request body
+     * @param &lt;Res&gt;       The type of the response
+     * @param requestSpec The request specification
+     * @return A CompletableFuture that will complete with the response
+     */
+    public &lt;Req, Res&gt; CompletableFuture&lt;Res&gt; executeAsync(RequestSpec&lt;Req, Res&gt; requestSpec) {
+<span class="fc" id="L124">        return CompletableFuture.supplyAsync(() -&gt; {</span>
+            try {
+<span class="nc" id="L126">                return delegate.execute(requestSpec);</span>
+<span class="fc" id="L127">            } catch (RocketRestException e) {</span>
+<span class="fc" id="L128">                throw new CompletionException(e);</span>
+            }
+        }, executor);
+    }
+
+    /**
+     * Shuts down the executor service.
+     */
+    public void shutdown() {
+<span class="fc" id="L137">        executor.shutdown();</span>
+<span class="fc" id="L138">    }</span>
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

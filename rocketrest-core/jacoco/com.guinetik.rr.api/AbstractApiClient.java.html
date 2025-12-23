@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractApiClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.api</a> &gt; <span class="el_source">AbstractApiClient.java</span></div><h1>AbstractApiClient.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.api;
+
+import com.guinetik.rr.RocketRestConfig;
+import com.guinetik.rr.RocketRestOptions;
+import com.guinetik.rr.auth.TokenExpiredException;
+import com.guinetik.rr.http.RocketClient;
+import com.guinetik.rr.http.RocketHeaders;
+import com.guinetik.rr.http.RocketRestException;
+import com.guinetik.rr.request.RequestSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Map;
+
+/**
+ * Abstract base class for API clients providing common HTTP request handling.
+ *
+ * &lt;p&gt;This class serves as the foundation for all API client implementations in RocketRest.
+ * It provides:
+ * &lt;ul&gt;
+ *   &lt;li&gt;Automatic token refresh on expiration&lt;/li&gt;
+ *   &lt;li&gt;Configurable retry logic with exponential backoff&lt;/li&gt;
+ *   &lt;li&gt;Request/response timing and logging&lt;/li&gt;
+ *   &lt;li&gt;Header management including authentication&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;Concrete implementations include:
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@link DefaultApiClient} - Synchronous blocking requests&lt;/li&gt;
+ *   &lt;li&gt;{@link AsyncApiClient} - Asynchronous requests with {@link java.util.concurrent.CompletableFuture}&lt;/li&gt;
+ *   &lt;li&gt;{@link FluentApiClient} - Functional style with {@link com.guinetik.rr.result.Result} pattern&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;h2&gt;Request Execution Flow&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // 1. Create request specification
+ * RequestSpec&amp;lt;Void, User&amp;gt; request = RequestBuilder.get(&quot;/users/1&quot;)
+ *     .responseType(User.class)
+ *     .build();
+ *
+ * // 2. Execute with automatic retry and timing
+ * User user = client.execute(request);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Configuration&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Configure client options
+ * client.configure(RocketRestOptions.RETRY_ENABLED, true);
+ * client.configure(RocketRestOptions.MAX_RETRIES, 5);
+ * client.configure(RocketRestOptions.LOG_REQUEST_BODY, true);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see DefaultApiClient
+ * @see AsyncApiClient
+ * @see FluentApiClient
+ * @since 1.0.0
+ */
+public abstract class AbstractApiClient {
+<span class="fc" id="L60">    protected final Logger logger = LoggerFactory.getLogger(this.getClass());</span>
+
+    protected String baseUrl;
+    protected final RocketRestConfig config;
+    protected final RocketRestOptions options;
+    protected RocketClient httpClient;
+
+    /**
+     * Creates a new API client.
+     *
+     * @param baseUrl    The base URL for API requests.
+     * @param config     The RocketRest configuration.
+     * @param httpClient The HTTP client implementation to use.
+     */
+<span class="fc" id="L74">    protected AbstractApiClient(String baseUrl, RocketRestConfig config, RocketClient httpClient) {</span>
+<span class="fc" id="L75">        this.baseUrl = baseUrl;</span>
+<span class="fc" id="L76">        this.config = config;</span>
+<span class="fc" id="L77">        this.httpClient = httpClient;</span>
+
+        // Initialize options with defaults from config if available
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">        if (config != null &amp;&amp; config.getDefaultOptions() != null) {</span>
+            // Create a new ClientOptions and copy values from the config's default options
+<span class="fc" id="L82">            this.options = new RocketRestOptions();</span>
+<span class="fc" id="L83">            RocketRestOptions defaultOptions = config.getDefaultOptions();</span>
+
+            // Copy all default options to this client's options
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            for (String key : defaultOptions.getKeys()) {</span>
+<span class="fc" id="L87">                Object value = defaultOptions.getRaw(key);</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                if (value != null) {</span>
+<span class="fc" id="L89">                    this.options.set(key, value);</span>
+                }
+<span class="fc" id="L91">            }</span>
+
+<span class="fc" id="L93">            logger.debug(&quot;Initialized client with default options from config&quot;);</span>
+<span class="fc" id="L94">        } else {</span>
+<span class="nc" id="L95">            this.options = new RocketRestOptions();</span>
+        }
+<span class="fc" id="L97">    }</span>
+
+    /**
+     * Method to handle token refresh.
+     * Refreshes the authentication token if needed using the configured auth strategy.
+     */
+    protected void refreshToken() {
+<span class="pc bpc" id="L104" title="3 of 6 branches missed.">        if (config != null &amp;&amp; config.getAuthStrategy() != null &amp;&amp; config.getAuthStrategy().needsTokenRefresh()) {</span>
+<span class="nc" id="L105">            logger.debug(&quot;Refreshing authentication token&quot;);</span>
+<span class="nc" id="L106">            boolean refreshed = config.getAuthStrategy().refreshCredentials();</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            if (refreshed) {</span>
+<span class="nc" id="L108">                logger.debug(&quot;Credentials refreshed successfully&quot;);</span>
+            } else {
+<span class="nc" id="L110">                logger.warn(&quot;Credential refresh failed&quot;);</span>
+            }
+        }
+<span class="fc" id="L113">    }</span>
+
+
+    /**
+     * Sets a client option value.
+     *
+     * @param key   The option key.
+     * @param value The option value.
+     * @return This client instance for method chaining.
+     */
+    public AbstractApiClient configure(String key, Object value) {
+<span class="fc" id="L124">        options.set(key, value);</span>
+<span class="fc" id="L125">        logger.debug(&quot;Set configuration option: {} = {}&quot;, key, value);</span>
+<span class="fc" id="L126">        return this;</span>
+    }
+
+    /**
+     * Executes the given request specification and returns the response.
+     *
+     * @param &lt;Req&gt;       The type of the request.
+     * @param &lt;Res&gt;       The type of the response.
+     * @param requestSpec The request specification.
+     * @return The response object.
+     */
+    public &lt;Req, Res&gt; Res execute(RequestSpec&lt;Req, Res&gt; requestSpec) {
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (options.getBoolean(RocketRestOptions.TIMING_ENABLED, true)) {</span>
+<span class="fc" id="L139">            return executeWithTiming(requestSpec);</span>
+        }
+<span class="nc" id="L141">        return executeWithRetry(requestSpec, options.getInt(RocketRestOptions.MAX_RETRIES, 1));</span>
+    }
+
+    /**
+     * Executes a request with timing measurement if enabled.
+     *
+     * @param &lt;Req&gt;       The type of the request.
+     * @param &lt;Res&gt;       The type of the response.
+     * @param requestSpec The specification of the request to be executed.
+     * @return The response object.
+     */
+    protected &lt;Req, Res&gt; Res executeWithTiming(RequestSpec&lt;Req, Res&gt; requestSpec) {
+<span class="fc" id="L153">        long startTime = System.currentTimeMillis();</span>
+        try {
+<span class="fc" id="L155">            return executeWithRetry(requestSpec, options.getInt(RocketRestOptions.MAX_RETRIES, 1));</span>
+        } finally {
+<span class="fc" id="L157">            long duration = System.currentTimeMillis() - startTime;</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">            if (options.getBoolean(RocketRestOptions.LOGGING_ENABLED, true)) {</span>
+<span class="fc" id="L159">                logger.info(&quot;Request completed in {}ms: {} {}&quot;, duration,</span>
+<span class="fc" id="L160">                        requestSpec.getMethod(), requestSpec.getEndpoint());</span>
+            }
+        }
+    }
+
+    /**
+     * Executes an API request with retry logic. If the request fails due to a token expiration,
+     * it will attempt to refresh the token and retry the request up to a maximum number of retries.
+     *
+     * @param &lt;Req&gt;       The type of the request.
+     * @param &lt;Res&gt;       The type of the response.
+     * @param requestSpec The specification of the request to be executed.
+     * @param retriesLeft The number of retries remaining.
+     * @return The response object.
+     * @throws ApiException if the request fails after all retries are exhausted.
+     */
+    protected &lt;Req, Res&gt; Res executeWithRetry(RequestSpec&lt;Req, Res&gt; requestSpec, int retriesLeft) {
+        try {
+            // If logging is enabled, log the request
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">            if (options.getBoolean(RocketRestOptions.LOGGING_ENABLED, true)) {</span>
+<span class="fc" id="L180">                logRequest(requestSpec);</span>
+            }
+            // If we have auth headers, apply them early, at the requestspec level
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">            if(config.getAuthStrategy() != null) {</span>
+<span class="fc" id="L184">                config.getAuthStrategy().applyAuthHeaders(requestSpec.getHeaders());</span>
+            }
+            // Delegate to the HTTP client implementation
+<span class="fc" id="L187">            return httpClient.execute(requestSpec);</span>
+<span class="nc" id="L188">        } catch (TokenExpiredException e) {</span>
+<span class="nc bnc" id="L189" title="All 4 branches missed.">            if (retriesLeft &gt; 0 &amp;&amp; options.getBoolean(RocketRestOptions.RETRY_ENABLED, true)) {</span>
+<span class="nc" id="L190">                logger.debug(&quot;Token expired, attempting refresh. Retries left: {}&quot;, retriesLeft);</span>
+<span class="nc" id="L191">                refreshToken();</span>
+<span class="nc" id="L192">                config.getAuthStrategy().applyAuthHeaders(requestSpec.getHeaders());</span>
+                // Apply delay if configured
+<span class="nc" id="L194">                long retryDelay = options.getLong(RocketRestOptions.RETRY_DELAY, 0);</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">                if (retryDelay &gt; 0) {</span>
+                    try {
+<span class="nc" id="L197">                        Thread.sleep(retryDelay);</span>
+<span class="nc" id="L198">                    } catch (InterruptedException ie) {</span>
+<span class="nc" id="L199">                        Thread.currentThread().interrupt();</span>
+<span class="nc" id="L200">                        throw new ApiException(&quot;Retry interrupted&quot;, ie);</span>
+<span class="nc" id="L201">                    }</span>
+                }
+<span class="nc" id="L203">                return executeWithRetry(requestSpec, retriesLeft - 1);</span>
+            }
+<span class="nc" id="L205">            logger.error(&quot;Token refresh failed after maximum retries&quot;);</span>
+<span class="nc" id="L206">            throw new ApiException(&quot;Token refresh failed after maximum retries&quot;, e);</span>
+<span class="nc" id="L207">        } catch (com.guinetik.rr.http.CircuitBreakerOpenException e) {</span>
+            // Don't wrap CircuitBreakerOpenException, just rethrow it
+<span class="nc" id="L209">            logger.warn(&quot;Circuit breaker is open&quot;, e);</span>
+<span class="nc" id="L210">            throw e;</span>
+<span class="nc" id="L211">        } catch (RocketRestException e) {</span>
+<span class="nc" id="L212">            logger.error(&quot;HTTP client error&quot;, e);</span>
+<span class="nc" id="L213">            throw new ApiException(&quot;Failed to execute request&quot;, e);</span>
+        }
+    }
+
+    /**
+     * Logs information about the request if logging is enabled.
+     *
+     * @param &lt;Req&gt;       The type of the request.
+     * @param &lt;Res&gt;       The type of the response.
+     * @param requestSpec The request specification.
+     */
+    protected &lt;Req, Res&gt; void logRequest(RequestSpec&lt;Req, Res&gt; requestSpec) {
+<span class="fc" id="L225">        logger.info(&quot;Executing {} request to: {}&quot;, requestSpec.getMethod(), requestSpec.getEndpoint());</span>
+
+<span class="pc bpc" id="L227" title="3 of 4 branches missed.">        if (options.getBoolean(RocketRestOptions.LOG_REQUEST_BODY, false) &amp;&amp; requestSpec.getBody() != null) {</span>
+            // In real implementation, should be careful about logging sensitive information
+<span class="nc" id="L229">            logger.debug(&quot;Request body: {}&quot;, requestSpec.getBody());</span>
+        }
+<span class="fc" id="L231">    }</span>
+
+    /**
+     * Creates a map of HTTP headers, including default headers, authorization headers,
+     * and any custom headers provided.
+     *
+     * @param customHeaders A map of custom headers to include in the request.
+     * @return A complete map of headers for the request.
+     */
+    protected RocketHeaders createHeaders(Map&lt;String, String&gt; customHeaders) {
+        // Start with default JSON headers
+<span class="nc" id="L242">        RocketHeaders headers = RocketHeaders.defaultJson();</span>
+
+        // Add auth headers using the auth strategy
+<span class="nc bnc" id="L245" title="All 4 branches missed.">        if (config != null &amp;&amp; config.getAuthStrategy() != null) {</span>
+            // Use the newer applyAuthHeaders method which has a better implementation
+<span class="nc" id="L247">            headers = config.getAuthStrategy().applyAuthHeaders(headers);</span>
+        }
+
+        // Add custom headers
+<span class="nc bnc" id="L251" title="All 2 branches missed.">        if (customHeaders != null) {</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">            for (Map.Entry&lt;String, String&gt; entry : customHeaders.entrySet()) {</span>
+<span class="nc" id="L253">                headers.set(entry.getKey(), entry.getValue());</span>
+<span class="nc" id="L254">            }</span>
+        }
+
+<span class="nc" id="L257">        return headers;</span>
+    }
+
+
+    public void setBaseUrl(String baseUrl){
+<span class="fc" id="L262">        this.baseUrl = baseUrl;</span>
+<span class="fc" id="L263">        this.config.setServiceUrl(baseUrl);</span>
+<span class="fc" id="L264">        this.httpClient.setBaseUrl(baseUrl);</span>
+<span class="fc" id="L265">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

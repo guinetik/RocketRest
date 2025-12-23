@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RequestInterceptor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.interceptor</a> &gt; <span class="el_source">RequestInterceptor.java</span></div><h1>RequestInterceptor.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.interceptor;
+
+import com.guinetik.rr.http.RocketRestException;
+import com.guinetik.rr.request.RequestSpec;
+
+/**
+ * Interceptor for adding cross-cutting behavior to HTTP request execution.
+ *
+ * &lt;p&gt;Interceptors provide lifecycle hooks that can modify requests before execution,
+ * transform responses after execution, and handle errors (including retry logic).
+ * They form a chain where each interceptor can delegate to the next.
+ *
+ * &lt;h2&gt;Interceptor Chain&lt;/h2&gt;
+ * &lt;pre&gt;
+ * Request → [Interceptor 1] → [Interceptor 2] → ... → [HTTP Client] → Response
+ *              ↓ beforeRequest()                           ↓
+ *              ↓ onError() if exception                    ↓
+ *              ← afterResponse() ←←←←←←←←←←←←←←←←←←←←←←←←←←
+ * &lt;/pre&gt;
+ *
+ * &lt;h2&gt;Creating an Interceptor&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * public class LoggingInterceptor implements RequestInterceptor {
+ *
+ *     &amp;#64;Override
+ *     public &amp;lt;Req, Res&amp;gt; RequestSpec&amp;lt;Req, Res&amp;gt; beforeRequest(RequestSpec&amp;lt;Req, Res&amp;gt; request) {
+ *         System.out.println(&quot;-&amp;gt; &quot; + request.getMethod() + &quot; &quot; + request.getEndpoint());
+ *         return request;
+ *     }
+ *
+ *     &amp;#64;Override
+ *     public &amp;lt;Res&amp;gt; Res afterResponse(Res response, RequestSpec&amp;lt;?, Res&amp;gt; request) {
+ *         System.out.println(&quot;&amp;lt;- Response received&quot;);
+ *         return response;
+ *     }
+ * }
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Retry Interceptor Example&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * public class RetryInterceptor implements RequestInterceptor {
+ *     private final int maxRetries = 3;
+ *
+ *     &amp;#64;Override
+ *     public &amp;lt;Req, Res&amp;gt; Res onError(RocketRestException e, RequestSpec&amp;lt;Req, Res&amp;gt; request,
+ *                                    InterceptorChain chain) throws RocketRestException {
+ *         if (isRetryable(e) &amp;amp;&amp;amp; chain.getRetryCount() &amp;lt; maxRetries) {
+ *             Thread.sleep(1000 * chain.getRetryCount()); // Exponential backoff
+ *             return chain.retry(request);
+ *         }
+ *         throw e;
+ *     }
+ * }
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Using Interceptors&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketClient client = RocketClientFactory.builder(&quot;https://api.example.com&quot;)
+ *     .withInterceptor(new LoggingInterceptor())
+ *     .withInterceptor(new RetryInterceptor(3, 1000))
+ *     .withInterceptor(new MetricsInterceptor())
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see InterceptorChain
+ * @see RetryInterceptor
+ * @since 1.1.0
+ */
+public interface RequestInterceptor {
+
+    /**
+     * Called before a request is executed.
+     *
+     * &lt;p&gt;This method can modify the request (e.g., add headers, transform body)
+     * or return the same request unchanged. To short-circuit the chain and
+     * prevent execution, throw an exception.
+     *
+     * @param request The request specification
+     * @param &lt;Req&gt; The request body type
+     * @param &lt;Res&gt; The response type
+     * @return The (possibly modified) request to execute
+     */
+    default &lt;Req, Res&gt; RequestSpec&lt;Req, Res&gt; beforeRequest(RequestSpec&lt;Req, Res&gt; request) {
+<span class="fc" id="L85">        return request;</span>
+    }
+
+    /**
+     * Called after a successful response is received.
+     *
+     * &lt;p&gt;This method can transform the response or perform side effects
+     * like logging or metrics collection.
+     *
+     * @param response The response from the server
+     * @param request The original request specification
+     * @param &lt;Res&gt; The response type
+     * @return The (possibly transformed) response
+     */
+    default &lt;Res&gt; Res afterResponse(Res response, RequestSpec&lt;?, Res&gt; request) {
+<span class="fc" id="L100">        return response;</span>
+    }
+
+    /**
+     * Called when an exception occurs during request execution.
+     *
+     * &lt;p&gt;This method can:
+     * &lt;ul&gt;
+     *   &lt;li&gt;Retry the request using {@link InterceptorChain#retry(RequestSpec)}&lt;/li&gt;
+     *   &lt;li&gt;Transform the exception into a different one&lt;/li&gt;
+     *   &lt;li&gt;Recover and return a fallback response&lt;/li&gt;
+     *   &lt;li&gt;Rethrow the exception (default behavior)&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * @param e The exception that occurred
+     * @param request The request that failed
+     * @param chain The interceptor chain (use for retry)
+     * @param &lt;Req&gt; The request body type
+     * @param &lt;Res&gt; The response type
+     * @return A recovered response, or throws an exception
+     * @throws RocketRestException If the error cannot be handled
+     */
+    default &lt;Req, Res&gt; Res onError(RocketRestException e, RequestSpec&lt;Req, Res&gt; request,
+                                    InterceptorChain chain) throws RocketRestException {
+<span class="fc" id="L124">        throw e;</span>
+    }
+
+    /**
+     * Returns the order of this interceptor in the chain.
+     *
+     * &lt;p&gt;Lower values execute first. Use negative values for interceptors
+     * that must run early (e.g., authentication), and positive values
+     * for interceptors that should run late (e.g., logging).
+     *
+     * &lt;p&gt;Suggested ordering:
+     * &lt;ul&gt;
+     *   &lt;li&gt;-100: Authentication/Authorization&lt;/li&gt;
+     *   &lt;li&gt;0: Default (most interceptors)&lt;/li&gt;
+     *   &lt;li&gt;100: Retry logic&lt;/li&gt;
+     *   &lt;li&gt;200: Logging/Metrics&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * @return The order value (lower = earlier)
+     */
+    default int getOrder() {
+<span class="fc" id="L145">        return 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

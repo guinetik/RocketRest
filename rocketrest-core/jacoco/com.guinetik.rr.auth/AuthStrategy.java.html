@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthStrategy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.auth</a> &gt; <span class="el_source">AuthStrategy.java</span></div><h1>AuthStrategy.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.auth;
+
+import com.guinetik.rr.http.RocketHeaders;
+
+/**
+ * Interface for authentication strategies used by RocketRest.
+ *
+ * &lt;p&gt;Authentication strategies encapsulate the logic for different authentication methods,
+ * from simple bearer tokens to complex OAuth 2.0 flows. Implementations are pluggable
+ * and can be configured via {@link com.guinetik.rr.RocketRestConfig}.
+ *
+ * &lt;h2&gt;Available Implementations&lt;/h2&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@link NoAuthStrategy} - No authentication&lt;/li&gt;
+ *   &lt;li&gt;{@link BasicAuthStrategy} - HTTP Basic authentication&lt;/li&gt;
+ *   &lt;li&gt;{@link BearerTokenStrategy} - Bearer token authentication&lt;/li&gt;
+ *   &lt;li&gt;{@link OAuth2ClientCredentialsStrategy} - OAuth 2.0 client credentials flow&lt;/li&gt;
+ *   &lt;li&gt;{@link OAuth2PasswordStrategy} - OAuth 2.0 password grant flow&lt;/li&gt;
+ *   &lt;li&gt;{@link OAuth2AssertionStrategy} - OAuth 2.0 assertion/SAML flow&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;h2&gt;Using Strategies&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Via factory (recommended)
+ * AuthStrategy bearer = AuthStrategyFactory.createBearerToken(&quot;my-token&quot;);
+ * AuthStrategy basic = AuthStrategyFactory.createBasicAuth(&quot;user&quot;, &quot;pass&quot;);
+ * AuthStrategy oauth = AuthStrategyFactory.createOAuth2ClientCredentials(
+ *     &quot;client-id&quot;, &quot;client-secret&quot;, &quot;https://auth.example.com/token&quot;
+ * );
+ *
+ * // Configure in RocketRestConfig
+ * RocketRestConfig config = RocketRestConfig.builder(&quot;https://api.example.com&quot;)
+ *     .authStrategy(bearer)
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Custom Strategy Implementation&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * public class CustomAuthStrategy implements AuthStrategy {
+ *     {@literal @}Override
+ *     public AuthType getType() {
+ *         return AuthType.BEARER_TOKEN;
+ *     }
+ *
+ *     {@literal @}Override
+ *     public RocketHeaders applyAuthHeaders(RocketHeaders headers) {
+ *         headers.set(&quot;X-Custom-Auth&quot;, computeAuthValue());
+ *         return headers;
+ *     }
+ *
+ *     {@literal @}Override
+ *     public boolean needsTokenRefresh() {
+ *         return isTokenExpired();
+ *     }
+ *
+ *     {@literal @}Override
+ *     public boolean refreshCredentials() {
+ *         return fetchNewToken();
+ *     }
+ * }
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see AuthStrategyFactory
+ * @see com.guinetik.rr.RocketRestConfig
+ * @since 1.0.0
+ */
+public interface AuthStrategy {
+
+    /**
+     * Enum representing different authentication types.
+     */
+<span class="fc" id="L73">    enum AuthType {</span>
+<span class="fc" id="L74">        NONE,</span>
+<span class="fc" id="L75">        BEARER_TOKEN,</span>
+<span class="fc" id="L76">        BASIC,</span>
+<span class="fc" id="L77">        OAUTH_CLIENT_CREDENTIALS,</span>
+<span class="fc" id="L78">        OAUTH_IDP,</span>
+<span class="fc" id="L79">        OAUTH_PASSWORD,</span>
+<span class="fc" id="L80">        OAUTH_ASSERTION</span>
+    }
+
+    /**
+     * Returns the auth type of this strategy.
+     * @return the authentication type
+     */
+    AuthType getType();
+
+    /**
+     * Applies authentication headers to an existing HttpHeader object.
+     * @param headers the current HttpHeader to update
+     * @return the updated HttpHeader
+     */
+    RocketHeaders applyAuthHeaders(RocketHeaders headers);
+
+    /**
+     * Indicates whether this strategy needs a token refresh.
+     * @return true if token refresh is required
+     */
+    boolean needsTokenRefresh();
+
+    /**
+     * Handles refreshing the authentication credentials for strategies that support it.
+     * @return true if the credentials were successfully refreshed
+     * @throws TokenRefreshException if the refresh operation fails
+     */
+    boolean refreshCredentials();
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

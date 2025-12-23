@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthStrategyFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.auth</a> &gt; <span class="el_source">AuthStrategyFactory.java</span></div><h1>AuthStrategyFactory.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.auth;
+
+import java.util.Map;
+import java.util.function.BooleanSupplier;
+
+/**
+ * Factory for creating {@link AuthStrategy} instances.
+ *
+ * &lt;p&gt;This factory provides static methods to create various authentication strategies
+ * without directly instantiating the strategy classes. It's the recommended way to
+ * create authentication strategies for use with {@link com.guinetik.rr.RocketRestConfig}.
+ *
+ * &lt;h2&gt;No Authentication&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * AuthStrategy noAuth = AuthStrategyFactory.createNoAuth();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Basic Authentication&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * AuthStrategy basic = AuthStrategyFactory.createBasicAuth(&quot;username&quot;, &quot;password&quot;);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Bearer Token&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Simple bearer token
+ * AuthStrategy bearer = AuthStrategyFactory.createBearerToken(&quot;my-api-token&quot;);
+ *
+ * // Bearer token with custom refresh logic
+ * AuthStrategy refreshable = AuthStrategyFactory.createBearerToken(&quot;initial-token&quot;, () -&amp;gt; {
+ *     // Custom refresh logic
+ *     String newToken = fetchNewTokenFromServer();
+ *     return newToken != null;
+ * });
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;OAuth 2.0 Client Credentials&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * AuthStrategy oauth = AuthStrategyFactory.createOAuth2ClientCredentials(
+ *     &quot;client-id&quot;,
+ *     &quot;client-secret&quot;,
+ *     &quot;https://auth.example.com/oauth/token&quot;
+ * );
+ *
+ * // With additional parameters (e.g., scope)
+ * Map&amp;lt;String, String&amp;gt; params = new HashMap&amp;lt;&amp;gt;();
+ * params.put(&quot;scope&quot;, &quot;read write&quot;);
+ * AuthStrategy oauthWithScope = AuthStrategyFactory.createOAuth2ClientCredentials(
+ *     &quot;client-id&quot;, &quot;client-secret&quot;, &quot;https://auth.example.com/oauth/token&quot;, params
+ * );
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;OAuth 2.0 Password Grant&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * AuthStrategy password = AuthStrategyFactory.createOAuth2Password(
+ *     &quot;user@example.com&quot;,
+ *     &quot;userPassword&quot;,
+ *     &quot;https://auth.example.com/oauth/token&quot;
+ * );
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see AuthStrategy
+ * @see com.guinetik.rr.RocketRestConfig
+ * @since 1.0.0
+ */
+<span class="nc" id="L66">public class AuthStrategyFactory {</span>
+    
+    /**
+     * Creates a strategy that does not perform authentication.
+     * 
+     * @return a new no-auth strategy
+     */
+    public static AuthStrategy createNoAuth() {
+<span class="fc" id="L74">        return new NoAuthStrategy();</span>
+    }
+    
+    /**
+     * Creates a strategy that uses HTTP Basic authentication.
+     * 
+     * @param username the username
+     * @param password the password
+     * @return a new basic auth strategy
+     */
+    public static AuthStrategy createBasicAuth(String username, String password) {
+<span class="fc" id="L85">        return new BasicAuthStrategy(username, password);</span>
+    }
+    
+    /**
+     * Creates a strategy that uses Bearer token authentication.
+     * 
+     * @param token the bearer token
+     * @return a new bearer token strategy
+     */
+    public static AuthStrategy createBearerToken(String token) {
+<span class="fc" id="L95">        return new BearerTokenStrategy(token);</span>
+    }
+    
+    /**
+     * Creates a strategy that uses Bearer token authentication with custom refresh logic.
+     * 
+     * @param token             the bearer token
+     * @param refreshTokenLogic a {@link BooleanSupplier} that dictates the behavior of token refresh.
+     *                          It should return {@code true} if the token was successfully refreshed, {@code false} otherwise.
+     * @return a new bearer token strategy with custom refresh logic
+     */
+    public static AuthStrategy createBearerToken(String token, BooleanSupplier refreshTokenLogic) {
+<span class="fc" id="L107">        return new BearerTokenStrategy(token, refreshTokenLogic);</span>
+    }
+    
+    /**
+     * Creates a strategy that uses OAuth 2.0 client credentials flow.
+     * 
+     * @param clientId the OAuth 2.0 client ID
+     * @param clientSecret the OAuth 2.0 client secret
+     * @return a new OAuth 2.0 client credentials strategy
+     */
+    public static AuthStrategy createOAuth2ClientCredentials(String clientId, String clientSecret, String tokenUrl) {
+<span class="fc" id="L118">        return new OAuth2ClientCredentialsStrategy(clientId, clientSecret, tokenUrl);</span>
+    }
+    
+    /**
+     * Creates a strategy that uses OAuth 2.0 client credentials flow with additional parameters.
+     * 
+     * @param clientId the OAuth 2.0 client ID
+     * @param clientSecret the OAuth 2.0 client secret
+     * @param tokenUrl the token endpoint URL
+     * @param additionalParams additional parameters to include in the token request
+     * @return a new OAuth 2.0 client credentials strategy
+     */
+    public static AuthStrategy createOAuth2ClientCredentials(String clientId, String clientSecret, String tokenUrl,
+                                                           Map&lt;String, String&gt; additionalParams) {
+<span class="nc" id="L132">        return new OAuth2ClientCredentialsStrategy(clientId, clientSecret, tokenUrl, additionalParams);</span>
+    }
+    
+    /**
+     * Creates a strategy that uses OAuth 2.0 password flow.
+     * 
+     * @param username the user's username
+     * @param password the user's password
+     * @return a new OAuth 2.0 password strategy
+     */
+    public static AuthStrategy createOAuth2Password(String username, String password, String tokenUrl) {
+<span class="nc" id="L143">        return new OAuth2PasswordStrategy(username, password, null, null, tokenUrl);</span>
+    }
+    
+    /**
+     * Creates a strategy that uses OAuth 2.0 password flow with client credentials.
+     * 
+     * @param username the user's username
+     * @param password the user's password
+     * @param clientId the OAuth 2.0 client ID
+     * @param clientSecret the OAuth 2.0 client secret
+     * @return a new OAuth 2.0 password strategy
+     */
+    public static AuthStrategy createOAuth2Password(String username, String password, 
+                                                  String clientId, String clientSecret, String tokenUrl) {
+<span class="nc" id="L157">        return new OAuth2PasswordStrategy(username, password, clientId, clientSecret, tokenUrl);</span>
+    }
+    
+    /**
+     * Creates a strategy that uses OAuth 2.0 password flow with client credentials and additional parameters.
+     * 
+     * @param username the user's username
+     * @param password the user's password
+     * @param clientId the OAuth 2.0 client ID
+     * @param clientSecret the OAuth 2.0 client secret
+     * @param tokenUrl the token endpoint URL
+     * @param additionalParams additional parameters to include in the token request
+     * @return a new OAuth 2.0 password strategy
+     */
+    public static AuthStrategy createOAuth2Password(String username, String password, 
+                                                  String clientId, String clientSecret,
+                                                  String tokenUrl,
+                                                  Map&lt;String, String&gt; additionalParams) {
+<span class="nc" id="L175">        return new OAuth2PasswordStrategy(username, password, clientId, clientSecret, tokenUrl, additionalParams);</span>
+    }
+
+    /**
+     * Creates a strategy that uses OAuth 2.0 assertion flow.
+     * This can be used with various identity providers like SAP, Azure AD, Okta, etc.
+     * 
+     * @param clientId       the OAuth client ID
+     * @param userId         the user ID
+     * @param privateKey     the private key for assertion
+     * @param companyId      the company ID (optional, can be null)
+     * @param grantType      the OAuth grant type
+     * @param assertionUrl   the assertion endpoint URL
+     * @param tokenUrl       the token endpoint URL
+     * @return a new OAuth 2.0 assertion strategy
+     */
+    public static AuthStrategy createOAuth2Assertion(String clientId, String userId, String privateKey,
+                                           String companyId, String grantType, String assertionUrl, String tokenUrl) {
+<span class="nc" id="L193">        return new OAuth2AssertionStrategy(clientId, userId, privateKey, companyId, grantType, assertionUrl, tokenUrl);</span>
+    }
+
+    /**
+     * Creates a strategy that uses OAuth 2.0 assertion flow with additional parameters.
+     * This can be used with various identity providers like SAP, Azure AD, Okta, etc.
+     * 
+     * @param clientId                 the OAuth client ID
+     * @param userId                   the user ID
+     * @param privateKey               the private key for assertion
+     * @param companyId                the company ID (optional, can be null)
+     * @param grantType                the OAuth grant type
+     * @param assertionUrl             the assertion endpoint URL
+     * @param tokenUrl                 the token endpoint URL
+     * @param additionalAssertionParams additional parameters for assertion request
+     * @param additionalTokenParams    additional parameters for token request
+     * @return a new OAuth 2.0 assertion strategy
+     */
+    public static AuthStrategy createOAuth2Assertion(String clientId, String userId, String privateKey,
+                                           String companyId, String grantType, String assertionUrl, String tokenUrl,
+                                           Map&lt;String, String&gt; additionalAssertionParams,
+                                           Map&lt;String, String&gt; additionalTokenParams) {
+<span class="nc" id="L215">        return new OAuth2AssertionStrategy(clientId, userId, privateKey, companyId, grantType, assertionUrl, tokenUrl,</span>
+                                 additionalAssertionParams, additionalTokenParams);
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

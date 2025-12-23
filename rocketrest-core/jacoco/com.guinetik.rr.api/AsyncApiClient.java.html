@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AsyncApiClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.api</a> &gt; <span class="el_source">AsyncApiClient.java</span></div><h1>AsyncApiClient.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.api;
+
+import com.guinetik.rr.RocketRestConfig;
+import com.guinetik.rr.http.AsyncHttpClient;
+import com.guinetik.rr.http.RocketClientFactory;
+import com.guinetik.rr.request.RequestSpec;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+
+/**
+ * Asynchronous API client that returns {@link CompletableFuture} for non-blocking operations.
+ *
+ * &lt;p&gt;This client executes HTTP requests asynchronously using a configurable thread pool,
+ * allowing the calling thread to continue processing while waiting for responses.
+ * Ideal for high-throughput applications or when making multiple concurrent API calls.
+ *
+ * &lt;h2&gt;Basic Usage&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * ExecutorService executor = Executors.newFixedThreadPool(4);
+ * AsyncApiClient client = new AsyncApiClient(&quot;https://api.example.com&quot;, config, executor);
+ *
+ * // Execute async request
+ * CompletableFuture&amp;lt;User&amp;gt; future = client.executeAsync(
+ *     RequestBuilder.get(&quot;/users/1&quot;)
+ *         .responseType(User.class)
+ *         .build()
+ * );
+ *
+ * // Process result when ready
+ * future.thenAccept(user -&amp;gt; System.out.println(&quot;Got: &quot; + user.getName()));
+ *
+ * // Don't forget to shutdown
+ * client.shutdown();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Multiple Concurrent Requests&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * CompletableFuture&amp;lt;User&amp;gt; user1 = client.executeAsync(getRequest(&quot;/users/1&quot;));
+ * CompletableFuture&amp;lt;User&amp;gt; user2 = client.executeAsync(getRequest(&quot;/users/2&quot;));
+ * CompletableFuture&amp;lt;User&amp;gt; user3 = client.executeAsync(getRequest(&quot;/users/3&quot;));
+ *
+ * // Wait for all to complete
+ * CompletableFuture.allOf(user1, user2, user3)
+ *     .thenRun(() -&amp;gt; System.out.println(&quot;All users loaded&quot;));
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Error Handling&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * client.executeAsync(request)
+ *     .thenAccept(user -&amp;gt; processUser(user))
+ *     .exceptionally(ex -&amp;gt; {
+ *         System.err.println(&quot;Failed: &quot; + ex.getMessage());
+ *         return null;
+ *     });
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see AbstractApiClient
+ * @see DefaultApiClient
+ * @see FluentApiClient
+ * @since 1.0.0
+ */
+public class AsyncApiClient extends AbstractApiClient {
+
+    private final AsyncHttpClient asyncClient;
+
+    /**
+     * Creates a new AsyncApiClient with the specified base URL, configuration, and executor.
+     *
+     * @param baseUrl  The base URL for API requests
+     * @param config   The RocketRest configuration
+     * @param executor The ExecutorService to run requests on
+     */
+    public AsyncApiClient(String baseUrl, RocketRestConfig config, ExecutorService executor) {
+<span class="fc" id="L76">        super(baseUrl, config, createAsyncHttpClient(baseUrl, config, executor));</span>
+<span class="fc" id="L77">        this.asyncClient = (AsyncHttpClient) httpClient;</span>
+<span class="fc" id="L78">    }</span>
+    
+    /**
+     * Creates a new AsyncApiClient with the specified base URL, configuration, and a
+     * pre-configured AsyncHttpClient instance.
+     *
+     * @param baseUrl     The base URL for API requests
+     * @param config      The RocketRest configuration
+     * @param asyncClient A pre-configured AsyncHttpClient instance
+     */
+    public AsyncApiClient(String baseUrl, RocketRestConfig config, AsyncHttpClient asyncClient) {
+<span class="nc" id="L89">        super(baseUrl, config, asyncClient);</span>
+<span class="nc" id="L90">        this.asyncClient = asyncClient;</span>
+<span class="nc" id="L91">    }</span>
+
+    /**
+     * Executes a request asynchronously.
+     *
+     * @param &lt;Req&gt;       The type of the request
+     * @param &lt;Res&gt;       The type of the response
+     * @param requestSpec The request specification
+     * @return A CompletableFuture that will complete with the response
+     */
+    public &lt;Req, Res&gt; CompletableFuture&lt;Res&gt; executeAsync(RequestSpec&lt;Req, Res&gt; requestSpec) {
+<span class="fc" id="L102">        return asyncClient.executeAsync(requestSpec);</span>
+    }
+
+    /**
+     * Shuts down the executor service.
+     */
+    public void shutdown() {
+<span class="fc" id="L109">        asyncClient.shutdown();</span>
+<span class="fc" id="L110">    }</span>
+
+    /**
+     * Creates an AsyncHttpClient with the appropriate options.
+     *
+     * @param baseUrl  The base URL for API requests
+     * @param config   The RocketRest configuration
+     * @param executor The ExecutorService to run requests on
+     * @return A new AsyncHttpClient
+     */
+    private static AsyncHttpClient createAsyncHttpClient(String baseUrl, RocketRestConfig config, ExecutorService executor) {
+<span class="fc" id="L121">        return RocketClientFactory.fromConfig(config)</span>
+<span class="fc" id="L122">                .withExecutorService(executor)</span>
+<span class="fc" id="L123">                .buildAsync();</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

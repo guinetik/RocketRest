@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MockRocketClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.http</a> &gt; <span class="el_source">MockRocketClient.java</span></div><h1>MockRocketClient.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.http;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.guinetik.rr.api.ApiException;
+import com.guinetik.rr.request.RequestSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.net.ssl.SSLContext;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.BiFunction;
+import java.util.regex.Pattern;
+
+/**
+ * Mock implementation of {@link RocketClient} for unit testing without network requests.
+ *
+ * &lt;p&gt;This client simulates HTTP responses based on predefined rules, enabling unit testing
+ * of code that depends on RocketRest without requiring actual network connectivity.
+ * It supports URL pattern matching, response simulation, and invocation tracking.
+ *
+ * &lt;h2&gt;Features&lt;/h2&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;Predefined mock responses for method/URL combinations&lt;/li&gt;
+ *   &lt;li&gt;Regex-based URL pattern matching&lt;/li&gt;
+ *   &lt;li&gt;Simulated network latency&lt;/li&gt;
+ *   &lt;li&gt;Custom HTTP status codes&lt;/li&gt;
+ *   &lt;li&gt;Invocation counting for verification&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;h2&gt;Basic Usage&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * MockRocketClient mockClient = new MockRocketClient();
+ *
+ * // Add mock response
+ * mockClient.addMockResponse(&quot;GET&quot;, &quot;/users/.*&quot;, (url, body) -&amp;gt; {
+ *     User user = new User();
+ *     user.setId(1);
+ *     user.setName(&quot;Test User&quot;);
+ *     return user;
+ * });
+ *
+ * // Execute request - returns mock response
+ * RequestSpec&amp;lt;Void, User&amp;gt; request = RequestBuilder.&amp;lt;Void, User&amp;gt;get(&quot;/users/1&quot;)
+ *     .responseType(User.class)
+ *     .build();
+ *
+ * User user = mockClient.execute(request);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Simulating Latency and Status Codes&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * mockClient.withLatency(&quot;/slow/.*&quot;, 1000L);  // 1 second delay
+ * mockClient.withStatusCode(&quot;/error/.*&quot;, 500); // Server error
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Verifying Calls&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Check invocation count
+ * int count = mockClient.getInvocationCount(&quot;GET&quot;, &quot;/users/.*&quot;);
+ * assertEquals(1, count);
+ *
+ * // Reset for next test
+ * mockClient.resetCounts();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see RocketClient
+ * @see com.guinetik.rr.RocketRestMock
+ * @since 1.0.0
+ */
+public class MockRocketClient implements RocketClient {
+<span class="nc" id="L74">    private static final Logger logger = LoggerFactory.getLogger(MockRocketClient.class);</span>
+
+    /**
+     * Represents a mock response rule with matching criteria
+     */
+    private static class MockRule {
+        private final String method;
+        private final Pattern urlPattern;
+        private final BiFunction&lt;String, Object, Object&gt; responseProducer;
+
+<span class="nc" id="L84">        public MockRule(String method, String urlPattern, BiFunction&lt;String, Object, Object&gt; responseProducer) {</span>
+<span class="nc" id="L85">            this.method = method;</span>
+<span class="nc" id="L86">            this.urlPattern = Pattern.compile(urlPattern);</span>
+<span class="nc" id="L87">            this.responseProducer = responseProducer;</span>
+<span class="nc" id="L88">        }</span>
+
+        public boolean matches(String method, String url) {
+<span class="nc bnc" id="L91" title="All 4 branches missed.">            return this.method.equalsIgnoreCase(method) &amp;&amp; urlPattern.matcher(url).matches();</span>
+        }
+
+        public Object produceResponse(String url, Object body) {
+<span class="nc" id="L95">            return responseProducer.apply(url, body);</span>
+        }
+    }
+<span class="nc" id="L98">    private final ObjectMapper objectMapper = new ObjectMapper();</span>
+<span class="nc" id="L99">    private final Map&lt;String, String&gt; headers = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L100">    private final Map&lt;String, Integer&gt; invocationCounts = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L101">    private final Map&lt;String, Long&gt; latencies = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L102">    private final Map&lt;String, Integer&gt; statusCodes = new HashMap&lt;&gt;();</span>
+    // Store rules instead of a simple map to support pattern matching
+<span class="nc" id="L104">    private final java.util.List&lt;MockRule&gt; mockRules = new java.util.ArrayList&lt;&gt;();</span>
+    private SSLContext sslContext;
+
+    /**
+     * Creates a new mock client instance.
+     */
+<span class="nc" id="L110">    public MockRocketClient() {</span>
+<span class="nc" id="L111">    }</span>
+
+    /**
+     * Sets a custom header value that will be included in response data
+     *
+     * @param name  Header name
+     * @param value Header value
+     * @return This MockRocketClient instance for chaining
+     */
+    public MockRocketClient withHeader(String name, String value) {
+<span class="nc" id="L121">        headers.put(name, value);</span>
+<span class="nc" id="L122">        return this;</span>
+    }
+
+    /**
+     * Sets the latency for a specific endpoint in milliseconds
+     *
+     * @param urlPattern URL pattern to match
+     * @param latencyMs  Latency in milliseconds
+     * @return This MockRocketClient instance for chaining
+     */
+    public MockRocketClient withLatency(String urlPattern, long latencyMs) {
+<span class="nc" id="L133">        latencies.put(urlPattern, latencyMs);</span>
+<span class="nc" id="L134">        return this;</span>
+    }
+
+    /**
+     * Sets the status code for a specific endpoint
+     *
+     * @param urlPattern URL pattern to match
+     * @param statusCode HTTP status code
+     * @return This MockRocketClient instance for chaining
+     */
+    public MockRocketClient withStatusCode(String urlPattern, int statusCode) {
+<span class="nc" id="L145">        statusCodes.put(urlPattern, statusCode);</span>
+<span class="nc" id="L146">        return this;</span>
+    }
+
+    /**
+     * Adds a mock response for a specific HTTP method and URL pattern.
+     * The URL pattern is treated as a regex pattern for more flexible matching.
+     *
+     * @param method           HTTP method (GET, POST, PUT, DELETE)
+     * @param urlPattern       URL pattern to match (regex supported)
+     * @param responseProducer Function that takes (url, requestBody) and returns a response object
+     */
+    public MockRocketClient addMockResponse(String method, String urlPattern,
+                                            BiFunction&lt;String, Object, Object&gt; responseProducer) {
+<span class="nc" id="L159">        mockRules.add(new MockRule(method, urlPattern, responseProducer));</span>
+<span class="nc" id="L160">        return this;</span>
+    }
+
+    /**
+     * Gets the number of times a specific endpoint has been invoked
+     *
+     * @param method     HTTP method
+     * @param urlPattern URL pattern
+     * @return Number of invocations
+     */
+    public int getInvocationCount(String method, String urlPattern) {
+<span class="nc" id="L171">        return invocationCounts.getOrDefault(method + &quot;:&quot; + urlPattern, 0);</span>
+    }
+
+    /**
+     * Resets all invocation counts
+     */
+    public void resetCounts() {
+<span class="nc" id="L178">        invocationCounts.clear();</span>
+<span class="nc" id="L179">    }</span>
+
+    /**
+     * Finds a matching mock response rule for the given method and URL.
+     */
+    private Optional&lt;MockRule&gt; findMatchingRule(String method, String url) {
+<span class="nc" id="L185">        return mockRules.stream()</span>
+<span class="nc" id="L186">                .filter(rule -&gt; rule.matches(method, url))</span>
+<span class="nc" id="L187">                .findFirst();</span>
+    }
+
+    @Override
+    public &lt;Req, Res&gt; Res execute(RequestSpec&lt;Req, Res&gt; requestSpec) throws RocketRestException {
+<span class="nc" id="L192">        String method = requestSpec.getMethod();</span>
+<span class="nc" id="L193">        String url = requestSpec.getEndpoint();</span>
+
+        // Track invocation
+<span class="nc" id="L196">        String key = method + &quot;:&quot; + url;</span>
+<span class="nc" id="L197">        invocationCounts.put(key, invocationCounts.getOrDefault(key, 0) + 1);</span>
+
+        // Simulate latency if configured
+<span class="nc" id="L200">        simulateLatency(url);</span>
+
+        // Find matching rule
+<span class="nc" id="L203">        Optional&lt;MockRule&gt; matchingRule = findMatchingRule(method, url);</span>
+
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        if (matchingRule.isPresent()) {</span>
+            try {
+<span class="nc" id="L207">                Object response = matchingRule.get().produceResponse(</span>
+                        url,
+<span class="nc" id="L209">                        requestSpec.getBody()</span>
+                );
+
+                // Convert the response to the expected type
+<span class="nc bnc" id="L213" title="All 2 branches missed.">                if (requestSpec.getResponseType().isInstance(response)) {</span>
+<span class="nc" id="L214">                    return (Res) response;</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                } else if (response != null) {</span>
+                    // Try to convert using ObjectMapper if types don't match directly
+<span class="nc" id="L217">                    return objectMapper.convertValue(response, requestSpec.getResponseType());</span>
+                }
+
+<span class="nc" id="L220">                throw new ApiException(&quot;Mock response could not be converted to required type: &quot;</span>
+<span class="nc" id="L221">                        + requestSpec.getResponseType().getName());</span>
+<span class="nc" id="L222">            } catch (Exception e) {</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">                if (e instanceof ApiException) {</span>
+<span class="nc" id="L224">                    throw (ApiException) e;</span>
+                }
+<span class="nc" id="L226">                throw new ApiException(&quot;Failed to process mock response&quot;, e);</span>
+            }
+        }
+
+        // If we get here, no matching mock was found
+<span class="nc" id="L231">        logger.warn(&quot;No mock response found for {} : {}&quot;, method, url);</span>
+<span class="nc" id="L232">        throw new ApiException(&quot;No mock response configured for &quot; + method + &quot;:&quot; + url);</span>
+    }
+
+    /**
+     * Simulates network latency based on configuration
+     */
+    private void simulateLatency(String url) {
+<span class="nc" id="L239">        long latency = latencies.entrySet().stream()</span>
+<span class="nc" id="L240">                .filter(entry -&gt; Pattern.compile(entry.getKey()).matcher(url).matches())</span>
+<span class="nc" id="L241">                .map(Map.Entry::getValue)</span>
+<span class="nc" id="L242">                .findFirst()</span>
+<span class="nc" id="L243">                .orElse(0L);</span>
+
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        if (latency &gt; 0) {</span>
+            try {
+<span class="nc" id="L247">                Thread.sleep(latency);</span>
+<span class="nc" id="L248">            } catch (InterruptedException e) {</span>
+<span class="nc" id="L249">                Thread.currentThread().interrupt();</span>
+<span class="nc" id="L250">            }</span>
+        }
+<span class="nc" id="L252">    }</span>
+
+    @Override
+    public void configureSsl(SSLContext sslContext) {
+<span class="nc" id="L256">        this.sslContext = sslContext;</span>
+<span class="nc" id="L257">    }</span>
+
+    @Override
+    public void setBaseUrl(String baseUrl) {
+
+<span class="nc" id="L262">    }</span>
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

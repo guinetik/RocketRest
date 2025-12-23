@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StreamUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.util</a> &gt; <span class="el_source">StreamUtils.java</span></div><h1>StreamUtils.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.util;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Scanner;
+
+/**
+ * Utility class for safe input stream operations with proper resource management.
+ *
+ * &lt;p&gt;This class provides static methods for reading input streams into strings,
+ * ensuring proper cleanup of resources even when exceptions occur.
+ *
+ * &lt;h2&gt;Reading Input Streams&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Read an input stream to string
+ * InputStream is = connection.getInputStream();
+ * String content = StreamUtils.readInputStreamAsString(is);
+ *
+ * // Read error stream (returns null if unavailable)
+ * InputStream errorStream = connection.getErrorStream();
+ * String error = StreamUtils.readErrorStream(errorStream);
+ * if (error != null) {
+ *     System.err.println(&quot;Error response: &quot; + error);
+ * }
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Usage in HTTP Response Handling&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+ * int status = conn.getResponseCode();
+ *
+ * if (status &amp;gt;= 200 &amp;amp;&amp;amp; status &amp;lt; 300) {
+ *     String body = StreamUtils.readInputStreamAsString(conn.getInputStream());
+ *     // Process successful response
+ * } else {
+ *     String error = StreamUtils.readErrorStream(conn.getErrorStream());
+ *     // Handle error response
+ * }
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @since 1.0.0
+ */
+public final class StreamUtils {
+    
+    private StreamUtils() {
+        // Utility class, no instantiation
+    }
+    
+    /**
+     * Reads an input stream into a string, handling resource cleanup properly.
+     * This method ensures the Scanner is properly closed after reading.
+     *
+     * @param is The input stream to read
+     * @return The string contents of the stream
+     * @throws IOException If an I/O error occurs
+     */
+    public static String readInputStreamAsString(InputStream is) throws IOException {
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (is == null) {</span>
+<span class="fc" id="L60">            return &quot;&quot;;</span>
+        }
+        
+<span class="fc" id="L63">        try (Scanner scanner = new Scanner(is, &quot;UTF-8&quot;).useDelimiter(&quot;\\A&quot;)) {</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            return scanner.hasNext() ? scanner.next() : &quot;&quot;;</span>
+        }
+    }
+    
+    /**
+     * Attempts to read from an error stream, handling possible exceptions gracefully.
+     * This method ensures the Scanner is properly closed after reading.
+     *
+     * @param errorStream The error stream to read
+     * @return The string contents of the stream, or null if not available
+     */
+    public static String readErrorStream(InputStream errorStream) {
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (errorStream == null) {</span>
+<span class="fc" id="L77">            return null;</span>
+        }
+        
+<span class="fc" id="L80">        try (Scanner scanner = new Scanner(errorStream, &quot;UTF-8&quot;).useDelimiter(&quot;\\A&quot;)) {</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            return scanner.hasNext() ? scanner.next() : &quot;&quot;;</span>
+<span class="nc" id="L82">        } catch (Exception e) {</span>
+            // Silently handle errors reading the error stream
+<span class="nc" id="L84">            return null;</span>
+        }
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

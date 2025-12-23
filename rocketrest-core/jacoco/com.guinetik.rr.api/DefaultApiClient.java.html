@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultApiClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.api</a> &gt; <span class="el_source">DefaultApiClient.java</span></div><h1>DefaultApiClient.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.api;
+
+import com.guinetik.rr.RocketRestConfig;
+import com.guinetik.rr.http.RocketClient;
+import com.guinetik.rr.http.RocketClientFactory;
+
+/**
+ * Default synchronous API client implementation.
+ *
+ * &lt;p&gt;This client executes HTTP requests synchronously, blocking the calling thread
+ * until the response is received. It's the simplest way to interact with REST APIs
+ * when you don't need asynchronous processing.
+ *
+ * &lt;h2&gt;Basic Usage&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketRestConfig config = RocketRestConfig.builder(&quot;https://api.example.com&quot;)
+ *     .authStrategy(AuthStrategyFactory.createBearerToken(&quot;token&quot;))
+ *     .build();
+ *
+ * DefaultApiClient client = new DefaultApiClient(&quot;https://api.example.com&quot;, config);
+ *
+ * // Execute a GET request (blocks until response)
+ * RequestSpec&amp;lt;Void, User&amp;gt; request = RequestBuilder.get(&quot;/users/1&quot;)
+ *     .responseType(User.class)
+ *     .build();
+ *
+ * User user = client.execute(request);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;With Custom HTTP Client&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Create client with circuit breaker
+ * RocketClient httpClient = RocketClientFactory.fromConfig(config)
+ *     .withCircuitBreaker(5, 30000)
+ *     .build();
+ *
+ * DefaultApiClient client = new DefaultApiClient(baseUrl, config, httpClient);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see AbstractApiClient
+ * @see AsyncApiClient
+ * @see FluentApiClient
+ * @since 1.0.0
+ */
+public class DefaultApiClient extends AbstractApiClient {
+
+    /**
+     * Creates a new DefaultApiClient with the specified base URL and configuration.
+     *
+     * @param baseUrl The base URL for API requests
+     * @param config  The RocketRest configuration
+     */
+    public DefaultApiClient(String baseUrl, RocketRestConfig config) {
+<span class="fc" id="L55">        super(baseUrl, config, createHttpClient(baseUrl, config));</span>
+<span class="fc" id="L56">    }</span>
+    
+    /**
+     * Creates a new DefaultApiClient with the specified base URL, configuration and a custom client.
+     *
+     * @param baseUrl The base URL for API requests
+     * @param config  The RocketRest configuration
+     * @param client  A custom RocketClient implementation
+     */
+    public DefaultApiClient(String baseUrl, RocketRestConfig config, RocketClient client) {
+<span class="nc" id="L66">        super(baseUrl, config, client);</span>
+<span class="nc" id="L67">    }</span>
+
+    /**
+     * Creates an HTTP client with the appropriate options.
+     *
+     * @param baseUrl The base URL for API requests
+     * @param config  The RocketRest configuration
+     * @return A new RocketClient
+     */
+    private static RocketClient createHttpClient(String baseUrl, RocketRestConfig config) {
+<span class="fc" id="L77">        return RocketClientFactory.fromConfig(config)</span>
+<span class="fc" id="L78">                .build();</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,405 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultHttpClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.http</a> &gt; <span class="el_source">DefaultHttpClient.java</span></div><h1>DefaultHttpClient.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.http;
+
+import com.guinetik.rr.RocketRestOptions;
+import com.guinetik.rr.auth.TokenExpiredException;
+import com.guinetik.rr.json.JsonObjectMapper;
+import com.guinetik.rr.request.RequestSpec;
+import com.guinetik.rr.util.ResponseLogger;
+import com.guinetik.rr.util.StreamUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.StringJoiner;
+
+/**
+ * Default implementation of {@link RocketClient} using Java's built-in {@link java.net.HttpURLConnection}.
+ *
+ * &lt;p&gt;This client provides HTTP request execution without external dependencies, making it
+ * suitable for environments where third-party HTTP libraries cannot be used. It supports
+ * all standard HTTP methods, custom headers, SSL/TLS configuration, and JSON serialization.
+ *
+ * &lt;h2&gt;Features&lt;/h2&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;Zero external HTTP dependencies (uses java.net.HttpURLConnection)&lt;/li&gt;
+ *   &lt;li&gt;Automatic JSON serialization/deserialization via Jackson&lt;/li&gt;
+ *   &lt;li&gt;SSL/TLS support with custom certificate configuration&lt;/li&gt;
+ *   &lt;li&gt;Configurable timeouts and request options&lt;/li&gt;
+ *   &lt;li&gt;Query parameter encoding and URL building&lt;/li&gt;
+ *   &lt;li&gt;Comprehensive error handling with status codes&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;h2&gt;Direct Usage&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Create a client
+ * DefaultHttpClient client = new DefaultHttpClient(&quot;https://api.example.com&quot;);
+ *
+ * // Build and execute a request
+ * RequestSpec&amp;lt;Void, User&amp;gt; request = RequestBuilder.&amp;lt;Void, User&amp;gt;get(&quot;/users/1&quot;)
+ *     .responseType(User.class)
+ *     .build();
+ *
+ * User user = client.execute(request);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;With Custom Options&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketRestOptions options = new RocketRestOptions();
+ * options.set(RocketRestOptions.LOGGING_ENABLED, true);
+ * options.set(RocketRestOptions.LOG_RESPONSE_BODY, true);
+ *
+ * DefaultHttpClient client = new DefaultHttpClient(
+ *     &quot;https://api.example.com&quot;,
+ *     options
+ * );
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Note&lt;/h2&gt;
+ * &lt;p&gt;For most use cases, prefer using {@link com.guinetik.rr.RocketRest} facade or
+ * {@link RocketClientFactory} instead of instantiating this class directly.
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see RocketClient
+ * @see RocketClientFactory
+ * @see com.guinetik.rr.RocketRest
+ * @since 1.0.0
+ */
+public class DefaultHttpClient implements RocketClient {
+
+<span class="fc" id="L79">    private static final Logger logger = LoggerFactory.getLogger(DefaultHttpClient.class);</span>
+
+    private String baseUrl;
+    private final RocketRestOptions clientOptions;
+    private SSLContext sslContext;
+
+    /**
+     * Creates a new DefaultHttpClient with the specified base URL.
+     *
+     * @param baseUrl The base URL for all requests
+     */
+    public DefaultHttpClient(String baseUrl) {
+<span class="nc" id="L91">        this(baseUrl, new RocketRestOptions());</span>
+<span class="nc" id="L92">    }</span>
+
+    /**
+     * Creates a new DefaultHttpClient with the specified base URL and client options.
+     *
+     * @param baseUrl       The base URL for all requests
+     * @param clientOptions The client options
+     */
+<span class="fc" id="L100">    public DefaultHttpClient(String baseUrl, RocketRestOptions clientOptions) {</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        this.baseUrl = baseUrl.endsWith(HttpConstants.Url.PATH_SEPARATOR) ?</span>
+<span class="fc" id="L102">                baseUrl : baseUrl + HttpConstants.Url.PATH_SEPARATOR;</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        this.clientOptions = clientOptions != null ? clientOptions : new RocketRestOptions();</span>
+<span class="fc" id="L104">    }</span>
+
+    @Override
+    public void configureSsl(SSLContext sslContext) {
+<span class="nc" id="L108">        this.sslContext = sslContext;</span>
+<span class="nc" id="L109">    }</span>
+
+    @Override
+    public void setBaseUrl(String baseUrl) {
+<span class="fc" id="L113">        this.baseUrl = baseUrl;</span>
+<span class="fc" id="L114">    }</span>
+
+    /**
+     * Gets the client options.
+     *
+     * @return The client options
+     */
+    public RocketRestOptions getClientOptions() {
+<span class="fc" id="L122">        return clientOptions;</span>
+    }
+
+    @Override
+    public &lt;Req, Res&gt; Res execute(RequestSpec&lt;Req, Res&gt; requestSpec) throws RocketRestException {
+        try {
+<span class="fc" id="L128">            String fullUrl = buildFullUrl(requestSpec);</span>
+<span class="fc" id="L129">            HttpURLConnection connection = configureConnection(fullUrl, requestSpec);</span>
+<span class="fc" id="L130">            setRequestBody(connection, requestSpec);</span>
+
+<span class="fc" id="L132">            return executeRequest(connection, requestSpec);</span>
+<span class="nc" id="L133">        } catch (TokenExpiredException e) {</span>
+<span class="nc" id="L134">            throw e;</span>
+<span class="fc" id="L135">        } catch (Exception e) {</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            if (e instanceof RocketRestException) {</span>
+<span class="fc" id="L137">                throw (RocketRestException) e;</span>
+            }
+<span class="fc" id="L139">            throw new RocketRestException(HttpConstants.Errors.EXECUTE_REQUEST, e);</span>
+        }
+    }
+
+    /**
+     * Builds the full URL including endpoint and query parameters.
+     * Validates that absolute URLs are not used with a non-empty base URL.
+     *
+     * @throws RocketRestException if an absolute URL is used with a non-empty base URL
+     */
+    private String buildFullUrl(RequestSpec&lt;?, ?&gt; requestSpec) throws RocketRestException {
+<span class="fc" id="L150">        String endpoint = requestSpec.getEndpoint();</span>
+
+        // Check if the endpoint is an absolute URL
+<span class="pc bpc" id="L153" title="2 of 4 branches missed.">        boolean isAbsoluteUrl = endpoint.startsWith(&quot;http://&quot;) || endpoint.startsWith(&quot;https://&quot;);</span>
+
+        // If baseUrl is not empty/blank and the endpoint is absolute, throw exception
+<span class="pc bpc" id="L156" title="5 of 6 branches missed.">        if (isAbsoluteUrl &amp;&amp; !baseUrl.trim().isEmpty() &amp;&amp; !baseUrl.equals(&quot;/&quot;)) {</span>
+<span class="nc" id="L157">            throw new RocketRestException(</span>
+                &quot;Cannot use absolute URL '&quot; + endpoint + &quot;' with base URL '&quot; + baseUrl +
+                &quot;'. Either use a relative path or set base URL to empty string.&quot;,
+                400,
+                null);
+        }
+
+        // If the endpoint is absolute, use it directly
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (isAbsoluteUrl) {</span>
+<span class="nc" id="L166">            String fullUrl = endpoint;</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">            if (!requestSpec.getQueryParams().isEmpty()) {</span>
+<span class="nc" id="L168">                fullUrl += buildQueryString(requestSpec.getQueryParams());</span>
+            }
+<span class="nc" id="L170">            return fullUrl;</span>
+        }
+
+        // Handle relative endpoints
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (endpoint.startsWith(HttpConstants.Url.PATH_SEPARATOR)) {</span>
+<span class="fc" id="L175">            endpoint = endpoint.substring(1);</span>
+        }
+
+<span class="fc" id="L178">        String fullUrl = baseUrl + endpoint;</span>
+
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (!requestSpec.getQueryParams().isEmpty()) {</span>
+<span class="fc" id="L181">            fullUrl += buildQueryString(requestSpec.getQueryParams());</span>
+        }
+
+<span class="fc" id="L184">        return fullUrl;</span>
+    }
+
+    /**
+     * Configures the HttpURLConnection with proper settings.
+     */
+    private &lt;Req, Res&gt; HttpURLConnection configureConnection(String fullUrl, RequestSpec&lt;Req, Res&gt; requestSpec)
+            throws IOException {
+<span class="fc" id="L192">        URL url = new URL(fullUrl);</span>
+<span class="fc" id="L193">        HttpURLConnection connection = (HttpURLConnection) url.openConnection();</span>
+        // Configure SSL if needed
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">        if (connection instanceof HttpsURLConnection &amp;&amp; sslContext != null) {</span>
+<span class="nc" id="L196">            ((HttpsURLConnection) connection).setSSLSocketFactory(sslContext.getSocketFactory());</span>
+        }
+        // Set timeouts
+<span class="fc" id="L199">        connection.setConnectTimeout(HttpConstants.Timeouts.DEFAULT_CONNECT_TIMEOUT);</span>
+<span class="fc" id="L200">        connection.setReadTimeout(HttpConstants.Timeouts.DEFAULT_READ_TIMEOUT);</span>
+        // Configure method
+<span class="fc" id="L202">        connection.setRequestMethod(requestSpec.getMethod());</span>
+        // Set headers
+<span class="fc" id="L204">        setRequestHeaders(connection, requestSpec);</span>
+<span class="fc" id="L205">        return connection;</span>
+    }
+
+    /**
+     * Sets the request headers on the connection.
+     */
+    private &lt;Req, Res&gt; void setRequestHeaders(HttpURLConnection connection, RequestSpec&lt;Req, Res&gt; requestSpec) {
+<span class="fc" id="L212">        RocketHeaders headers = requestSpec.getHeaders();</span>
+        // Set all headers on the connection
+<span class="fc" id="L214">        headers.asMap().forEach(connection::setRequestProperty);</span>
+<span class="fc" id="L215">    }</span>
+
+    /**
+     * Sets the request body if applicable.
+     */
+    private &lt;Req, Res&gt; void setRequestBody(HttpURLConnection connection, RequestSpec&lt;Req, Res&gt; requestSpec)
+            throws IOException {
+<span class="fc bfc" id="L222" title="All 4 branches covered.">        boolean hasBody = requestSpec.getBody() != null &amp;&amp; isMethodWithBody(requestSpec.getMethod());</span>
+
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        if (hasBody) {</span>
+<span class="fc" id="L225">            connection.setDoOutput(true);</span>
+            String jsonBody;
+
+            // If the body is already a String, use it directly
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            if (requestSpec.getBody() instanceof String) {</span>
+<span class="fc" id="L230">                jsonBody = (String) requestSpec.getBody();</span>
+            } else {
+                // Otherwise convert to JSON
+<span class="fc" id="L233">                jsonBody = JsonObjectMapper.toJsonString(requestSpec.getBody());</span>
+            }
+
+<span class="fc" id="L236">            try (OutputStream os = connection.getOutputStream()) {</span>
+<span class="fc" id="L237">                byte[] input = jsonBody.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L238">                os.write(input, 0, input.length);</span>
+            }
+        }
+<span class="fc" id="L241">    }</span>
+
+    /**
+     * Checks if the HTTP method supports a request body.
+     */
+    private boolean isMethodWithBody(String method) {
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        return method.equals(HttpConstants.Methods.POST) ||</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">                method.equals(HttpConstants.Methods.PUT) ||</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">                method.equals(HttpConstants.Methods.PATCH);</span>
+    }
+
+    /**
+     * Executes the configured request and processes the response.
+     */
+    private &lt;Req, Res&gt; Res executeRequest(HttpURLConnection connection, RequestSpec&lt;Req, Res&gt; requestSpec)
+            throws IOException, RocketRestException {
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">        if (getClientOptions().getBoolean(RocketRestOptions.LOGGING_ENABLED, true)) {</span>
+<span class="fc" id="L258">            logger.debug(&quot;Executing request: {} {}&quot;, connection.getRequestMethod(), connection.getURL());</span>
+        }
+<span class="fc" id="L260">        int statusCode = connection.getResponseCode();</span>
+<span class="fc" id="L261">        Map&lt;String, String&gt; responseHeaders = extractResponseHeaders(connection);</span>
+        // Log raw response
+<span class="fc" id="L263">        ResponseLogger.logRawResponse(statusCode, responseHeaders, clientOptions);</span>
+
+        // Check for token expired
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        if (statusCode == HttpConstants.StatusCodes.UNAUTHORIZED) {</span>
+<span class="nc" id="L267">            throw new TokenExpiredException(HttpConstants.Errors.TOKEN_EXPIRED);</span>
+        }
+
+        // Handle response based on status code
+<span class="pc bpc" id="L271" title="1 of 4 branches missed.">        if (statusCode &gt;= HttpConstants.StatusCodes.SUCCESS_MIN &amp;&amp;</span>
+                statusCode &lt; HttpConstants.StatusCodes.SUCCESS_MAX) {
+<span class="fc" id="L273">            return handleSuccessResponse(connection, requestSpec);</span>
+        } else {
+<span class="nc" id="L275">            handleErrorResponse(connection, statusCode);</span>
+            // This line is never reached as handleErrorResponse always throws an exception
+<span class="nc" id="L277">            return null;</span>
+        }
+    }
+
+    /**
+     * Extracts response headers from the connection.
+     */
+    private Map&lt;String, String&gt; extractResponseHeaders(HttpURLConnection connection) {
+<span class="fc" id="L285">        Map&lt;String, String&gt; responseHeaders = new HashMap&lt;&gt;();</span>
+        // Extract all headers
+<span class="fc" id="L287">        for (int i = 0; ; i++) {</span>
+<span class="fc" id="L288">            String headerName = connection.getHeaderFieldKey(i);</span>
+<span class="fc" id="L289">            String headerValue = connection.getHeaderField(i);</span>
+<span class="fc bfc" id="L290" title="All 4 branches covered.">            if (headerName == null &amp;&amp; headerValue == null) {</span>
+<span class="fc" id="L291">                break;</span>
+            }
+<span class="fc bfc" id="L293" title="All 2 branches covered.">            if (headerName != null) {</span>
+<span class="fc" id="L294">                responseHeaders.put(headerName, headerValue);</span>
+            }
+        }
+<span class="fc" id="L297">        return responseHeaders;</span>
+    }
+
+    /**
+     * Handles a successful HTTP response.
+     */
+    private &lt;Req, Res&gt; Res handleSuccessResponse(HttpURLConnection connection, RequestSpec&lt;Req, Res&gt; requestSpec)
+            throws IOException {
+
+        // Handle void response
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">        if (requestSpec.getResponseType() == Void.class) {</span>
+<span class="nc" id="L308">            return null;</span>
+        }
+
+        // Read and process response body
+<span class="fc" id="L312">        try (InputStream is = connection.getInputStream()) {</span>
+<span class="fc" id="L313">            String responseString = StreamUtils.readInputStreamAsString(is);</span>
+
+            // Log response body if enabled
+<span class="fc" id="L316">            ResponseLogger.logResponseBody(responseString, clientOptions);</span>
+
+            // Special case for String.class - return the raw response string
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">            if (requestSpec.getResponseType() == String.class) {</span>
+                @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L321">                Res result = (Res) responseString;</span>
+<span class="fc" id="L322">                return result;</span>
+            }
+
+            // Parse response to the requested type
+<span class="nc" id="L326">            return JsonObjectMapper.jsonToObject(responseString, requestSpec.getResponseType());</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">        }</span>
+    }
+
+    /**
+     * Handles an HTTP error response.
+     * Always throws an exception with the error details.
+     *
+     * @throws RocketRestException Always thrown with error details
+     */
+    private void handleErrorResponse(HttpURLConnection connection, int statusCode) throws RocketRestException {
+        // Get error details from the error stream
+<span class="fc" id="L338">        String errorBody = Optional.ofNullable(connection.getErrorStream())</span>
+<span class="fc" id="L339">                .map(is -&gt; {</span>
+                    try {
+<span class="fc" id="L341">                        return StreamUtils.readInputStreamAsString(is);</span>
+<span class="nc" id="L342">                    } catch (IOException e) {</span>
+<span class="nc" id="L343">                        logger.warn(&quot;Error reading error stream&quot;, e);</span>
+<span class="nc" id="L344">                        return null;</span>
+                    } finally {
+                        try {
+<span class="fc" id="L347">                            is.close();</span>
+<span class="nc" id="L348">                        } catch (IOException e) {</span>
+                            // Ignore close errors
+<span class="fc" id="L350">                        }</span>
+                    }
+                })
+<span class="fc" id="L353">                .orElse(null);</span>
+
+        // Log error response body if enabled
+<span class="fc" id="L356">        ResponseLogger.logResponseBody(errorBody, this.getClientOptions());</span>
+
+<span class="fc" id="L358">        throw new RocketRestException(</span>
+                HttpConstants.Errors.REQUEST_FAILED + statusCode,
+                statusCode,
+                errorBody
+        );
+    }
+
+    /**
+     * Builds a query string from a map of parameters.
+     *
+     * @param params The query parameters
+     * @return The formatted query string
+     */
+    private String buildQueryString(Map&lt;String, String&gt; params) {
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">        if (params.isEmpty()) {</span>
+<span class="nc" id="L373">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L375">        StringJoiner sj = new StringJoiner(</span>
+                HttpConstants.Url.QUERY_SEPARATOR,
+                HttpConstants.Url.QUERY_PREFIX,
+                &quot;&quot;);
+
+<span class="fc" id="L380">        params.forEach((key, value) -&gt;</span>
+<span class="fc" id="L381">                sj.add(key + HttpConstants.Url.PARAM_EQUALS + encodeParam(value))</span>
+        );
+<span class="fc" id="L383">        return sj.toString();</span>
+    }
+
+    /**
+     * Encodes a URL parameter.
+     *
+     * @param param The parameter to encode
+     * @return The encoded parameter
+     */
+    private String encodeParam(String param) {
+        try {
+<span class="fc" id="L394">            return java.net.URLEncoder.encode(param, HttpConstants.Encoding.UTF8);</span>
+<span class="nc" id="L395">        } catch (Exception e) {</span>
+<span class="nc" id="L396">            logger.warn(HttpConstants.Errors.ENCODE_PARAM, param, e);</span>
+<span class="nc" id="L397">            return param;</span>
+        }
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

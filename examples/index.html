@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Examples - RocketRest</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #000;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    .corefun-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+      padding: 0 24px;
+      background: #000;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .corefun-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #fafafa;
+      font-weight: 600;
+      font-size: 18px;
+      text-decoration: none;
+    }
+
+    .corefun-brand img {
+      width: 28px;
+      height: 24px;
+    }
+
+    .corefun-brand:hover {
+      opacity: 0.9;
+    }
+
+    .corefun-nav {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .corefun-badge {
+      padding: 4px 10px;
+      background: rgba(96, 165, 250, 0.15);
+      border: 1px solid rgba(96, 165, 250, 0.3);
+      border-radius: 4px;
+      color: #60a5fa;
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .corefun-back {
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      color: #a0a0a0;
+      font-size: 14px;
+      text-decoration: none;
+      transition: all 150ms ease;
+    }
+
+    .corefun-back:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fafafa;
+    }
+
+    .xref-frame {
+      position: fixed;
+      top: 60px;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border: none;
+      width: 100%;
+      height: calc(100vh - 60px);
+    }
+
+    @media (max-width: 768px) {
+      .corefun-header {
+        height: 52px;
+        padding: 0 16px;
+      }
+
+      .corefun-brand {
+        font-size: 16px;
+      }
+
+      .corefun-brand img {
+        width: 24px;
+        height: 20px;
+      }
+
+      .corefun-badge {
+        display: none;
+      }
+
+      .corefun-back {
+        padding: 6px 12px;
+        font-size: 13px;
+      }
+
+      .xref-frame {
+        top: 52px;
+        height: calc(100vh - 52px);
+      }
+    }
+  </style>
+
+<!-- <!-- terminal-javadocs-injected [jxr] -->
+<link rel="stylesheet" href="../terminal-styles/terminaljavadocs-jxr.min.css">
+<script src="../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head>
+<body>
+  <header class="corefun-header">
+    <a href="../index.html" class="corefun-brand">
+      <img src="../images/logo.svg" alt="RocketRest" />
+      <span>RocketRest</span>
+    </a>
+    <nav class="corefun-nav">
+      <span class="corefun-badge">Source Code</span>
+      <a href="../index.html" class="corefun-back">&larr; Back to Docs</a>
+    </nav>
+  </header>
+
+  <iframe id="xref-frame" src="../xref/overview-summary.html" class="xref-frame" title="Source Code Cross-Reference"></iframe>
+
+  <script>
+    (function() {
+      // Get the 'path' query parameter to load a specific file
+      // Usage: examples/index.html?path=com/guinetik/examples/HelloWorld.html
+      var params = new URLSearchParams(window.location.search);
+      var path = params.get('path');
+
+      if (path) {
+        // Sanitize: only allow paths within xref directory
+        // Remove any leading slashes or dots
+        path = path.replace(/^[\.\/]+/, '');
+
+        // Set the iframe source to the specified path
+        var frame = document.getElementById('xref-frame');
+        frame.src = '../xref/' + path;
+
+        // Update page title based on filename
+        var filename = path.split('/').pop().replace('.html', '');
+        document.title = filename + ' - RocketRest Examples';
+      }
+    })();
+  </script>
+</body>
+</html>

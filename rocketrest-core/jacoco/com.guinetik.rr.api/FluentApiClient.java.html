@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FluentApiClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.api</a> &gt; <span class="el_source">FluentApiClient.java</span></div><h1>FluentApiClient.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.api;
+
+import com.guinetik.rr.RocketRestConfig;
+import com.guinetik.rr.http.FluentHttpClient;
+import com.guinetik.rr.http.RocketClientFactory;
+import com.guinetik.rr.request.RequestBuilder;
+import com.guinetik.rr.request.RequestSpec;
+import com.guinetik.rr.result.ApiError;
+import com.guinetik.rr.result.Result;
+
+import java.util.Map;
+
+/**
+ * A fluent API client that uses the {@link Result} pattern instead of exceptions.
+ *
+ * &lt;p&gt;This client provides a functional, declarative approach to API calls where errors
+ * are returned as values rather than thrown as exceptions. This makes error handling
+ * explicit and composable.
+ *
+ * &lt;h2&gt;Basic Usage&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * FluentApiClient client = new FluentApiClient(&quot;https://api.example.com&quot;, config);
+ *
+ * Result&amp;lt;User, ApiError&amp;gt; result = client.get(&quot;/users/1&quot;, User.class);
+ *
+ * // Handle success and failure explicitly
+ * result.match(
+ *     user -&amp;gt; System.out.println(&quot;Found: &quot; + user.getName()),
+ *     error -&amp;gt; System.err.println(&quot;Error &quot; + error.getStatusCode() + &quot;: &quot; + error.getMessage())
+ * );
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Chaining Operations&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * String userName = client.get(&quot;/users/1&quot;, User.class)
+ *     .map(User::getName)
+ *     .map(String::toUpperCase)
+ *     .getOrElse(&quot;Unknown&quot;);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;POST with Body&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * CreateUserRequest request = new CreateUserRequest(&quot;John&quot;, &quot;john@example.com&quot;);
+ *
+ * Result&amp;lt;User, ApiError&amp;gt; result = client.post(&quot;/users&quot;, request, User.class);
+ *
+ * if (result.isSuccess()) {
+ *     User created = result.getValue();
+ *     System.out.println(&quot;Created user with ID: &quot; + created.getId());
+ * }
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see Result
+ * @see ApiError
+ * @see AbstractApiClient
+ * @since 1.0.0
+ */
+public class FluentApiClient extends AbstractApiClient {
+
+    private final FluentHttpClient fluentClient;
+    
+    /**
+     * Creates a new FluentApiClient with the specified base URL and configuration.
+     *
+     * @param baseUrl The base URL for API requests
+     * @param config  The RocketRest configuration
+     */
+    public FluentApiClient(String baseUrl, RocketRestConfig config) {
+<span class="fc" id="L70">        super(baseUrl, config, createFluentHttpClient(baseUrl, config));</span>
+<span class="fc" id="L71">        this.fluentClient = (FluentHttpClient) httpClient;</span>
+<span class="fc" id="L72">    }</span>
+    
+    /**
+     * Creates a new FluentApiClient with the specified base URL, configuration, and a
+     * pre-configured FluentHttpClient instance.
+     *
+     * @param baseUrl      The base URL for API requests
+     * @param config       The RocketRest configuration
+     * @param fluentClient A pre-configured FluentHttpClient instance
+     */
+    public FluentApiClient(String baseUrl, RocketRestConfig config, FluentHttpClient fluentClient) {
+<span class="nc" id="L83">        super(baseUrl, config, fluentClient);</span>
+<span class="nc" id="L84">        this.fluentClient = fluentClient;</span>
+<span class="nc" id="L85">    }</span>
+    
+    /**
+     * Executes a request and returns a Result object instead of throwing exceptions.
+     *
+     * @param &lt;Req&gt;       The type of the request
+     * @param &lt;Res&gt;       The type of the response
+     * @param requestSpec The request specification
+     * @return A Result containing either the response or an ApiError
+     */
+    public &lt;Req, Res&gt; Result&lt;Res, ApiError&gt; executeWithResult(RequestSpec&lt;Req, Res&gt; requestSpec) {
+        // Apply any request transformations from the abstract client
+<span class="fc" id="L97">        refreshToken(); // Refresh token if needed</span>
+<span class="fc" id="L98">        logRequest(requestSpec); // Log the request if enabled</span>
+        
+        // Delegate to the fluent client
+<span class="fc" id="L101">        return fluentClient.executeWithResult(requestSpec);</span>
+    }
+    
+    /**
+     * Performs a GET request using the Result pattern.
+     *
+     * @param &lt;Res&gt;          The type of the response
+     * @param endpoint       The API endpoint
+     * @param responseType   The class of the response type
+     * @return A Result containing either the response or an ApiError
+     */
+    public &lt;Res&gt; Result&lt;Res, ApiError&gt; get(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L113">        return this.&lt;Res&gt;get(endpoint, null, responseType);</span>
+    }
+    
+    /**
+     * Performs a GET request with headers using the Result pattern.
+     *
+     * @param &lt;Res&gt;          The type of the response
+     * @param endpoint       The API endpoint
+     * @param headers        The request headers
+     * @param responseType   The class of the response type
+     * @return A Result containing either the response or an ApiError
+     */
+    public &lt;Res&gt; Result&lt;Res, ApiError&gt; get(String endpoint, Map&lt;String, String&gt; headers, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L126">        RequestSpec&lt;Void, Res&gt; request = RequestBuilder.&lt;Void, Res&gt;get(endpoint)</span>
+<span class="nc" id="L127">                .headers(createHeaders(headers))</span>
+<span class="nc" id="L128">                .responseType(responseType)</span>
+<span class="nc" id="L129">                .build();</span>
+                
+<span class="nc" id="L131">        return this.&lt;Void, Res&gt;executeWithResult(request);</span>
+    }
+    
+    /**
+     * Performs a POST request using the Result pattern.
+     *
+     * @param &lt;Req&gt;          The type of the request body
+     * @param &lt;Res&gt;          The type of the response
+     * @param endpoint       The API endpoint
+     * @param body           The request body
+     * @param responseType   The class of the response type
+     * @return A Result containing either the response or an ApiError
+     */
+    public &lt;Req, Res&gt; Result&lt;Res, ApiError&gt; post(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L145">        return this.&lt;Req, Res&gt;post(endpoint, body, null, responseType);</span>
+    }
+    
+    /**
+     * Performs a POST request with headers using the Result pattern.
+     *
+     * @param &lt;Req&gt;          The type of the request body
+     * @param &lt;Res&gt;          The type of the response
+     * @param endpoint       The API endpoint
+     * @param body           The request body
+     * @param headers        The request headers
+     * @param responseType   The class of the response type
+     * @return A Result containing either the response or an ApiError
+     */
+    public &lt;Req, Res&gt; Result&lt;Res, ApiError&gt; post(String endpoint, Req body, Map&lt;String, String&gt; headers, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L160">        RequestSpec&lt;Req, Res&gt; request = RequestBuilder.&lt;Req, Res&gt;post(endpoint)</span>
+<span class="nc" id="L161">                .headers(createHeaders(headers))</span>
+<span class="nc" id="L162">                .body(body)</span>
+<span class="nc" id="L163">                .responseType(responseType)</span>
+<span class="nc" id="L164">                .build();</span>
+                
+<span class="nc" id="L166">        return this.&lt;Req, Res&gt;executeWithResult(request);</span>
+    }
+    
+    /**
+     * Performs a PUT request using the Result pattern.
+     *
+     * @param &lt;Req&gt;          The type of the request body
+     * @param &lt;Res&gt;          The type of the response
+     * @param endpoint       The API endpoint
+     * @param body           The request body
+     * @param responseType   The class of the response type
+     * @return A Result containing either the response or an ApiError
+     */
+    public &lt;Req, Res&gt; Result&lt;Res, ApiError&gt; put(String endpoint, Req body, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L180">        return this.&lt;Req, Res&gt;put(endpoint, body, null, responseType);</span>
+    }
+    
+    /**
+     * Performs a PUT request with headers using the Result pattern.
+     *
+     * @param &lt;Req&gt;          The type of the request body
+     * @param &lt;Res&gt;          The type of the response
+     * @param endpoint       The API endpoint
+     * @param body           The request body
+     * @param headers        The request headers
+     * @param responseType   The class of the response type
+     * @return A Result containing either the response or an ApiError
+     */
+    public &lt;Req, Res&gt; Result&lt;Res, ApiError&gt; put(String endpoint, Req body, Map&lt;String, String&gt; headers, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L195">        RequestSpec&lt;Req, Res&gt; request = RequestBuilder.&lt;Req, Res&gt;put(endpoint)</span>
+<span class="nc" id="L196">                .headers(createHeaders(headers))</span>
+<span class="nc" id="L197">                .body(body)</span>
+<span class="nc" id="L198">                .responseType(responseType)</span>
+<span class="nc" id="L199">                .build();</span>
+                
+<span class="nc" id="L201">        return this.&lt;Req, Res&gt;executeWithResult(request);</span>
+    }
+    
+    /**
+     * Performs a DELETE request using the Result pattern.
+     *
+     * @param &lt;Res&gt;          The type of the response
+     * @param endpoint       The API endpoint
+     * @param responseType   The class of the response type
+     * @return A Result containing either the response or an ApiError
+     */
+    public &lt;Res&gt; Result&lt;Res, ApiError&gt; delete(String endpoint, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L213">        return this.&lt;Res&gt;delete(endpoint, null, responseType);</span>
+    }
+    
+    /**
+     * Performs a DELETE request with headers using the Result pattern.
+     *
+     * @param &lt;Res&gt;          The type of the response
+     * @param endpoint       The API endpoint
+     * @param headers        The request headers
+     * @param responseType   The class of the response type
+     * @return A Result containing either the response or an ApiError
+     */
+    public &lt;Res&gt; Result&lt;Res, ApiError&gt; delete(String endpoint, Map&lt;String, String&gt; headers, Class&lt;Res&gt; responseType) {
+<span class="nc" id="L226">        RequestSpec&lt;Void, Res&gt; request = RequestBuilder.&lt;Void, Res&gt;delete(endpoint)</span>
+<span class="nc" id="L227">                .headers(createHeaders(headers))</span>
+<span class="nc" id="L228">                .responseType(responseType)</span>
+<span class="nc" id="L229">                .build();</span>
+                
+<span class="nc" id="L231">        return this.&lt;Void, Res&gt;executeWithResult(request);</span>
+    }
+    
+    /**
+     * Shutdown the client and release resources.
+     */
+    public void shutdown() {
+        // Currently just a placeholder for API compatibility with AsyncApiClient
+        // FluentHttpClient doesn't require explicit shutdown
+<span class="nc" id="L240">    }</span>
+    
+    /**
+     * Creates a FluentHttpClient with the appropriate options from config.
+     *
+     * @param baseUrl The base URL for API requests
+     * @param config  The RocketRest configuration
+     * @return A new FluentHttpClient
+     */
+    private static FluentHttpClient createFluentHttpClient(String baseUrl, RocketRestConfig config) {
+<span class="fc" id="L250">        return RocketClientFactory.fromConfig(config)</span>
+<span class="fc" id="L251">                .buildFluent();</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RocketHeaders.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.http</a> &gt; <span class="el_source">RocketHeaders.java</span></div><h1>RocketHeaders.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.http;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Fluent builder for HTTP request headers with convenience methods for common headers.
+ *
+ * &lt;p&gt;This class provides a type-safe way to build and manage HTTP headers for requests,
+ * with predefined constants for common header names and content types.
+ *
+ * &lt;h2&gt;Building Headers&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Create headers with fluent API
+ * RocketHeaders headers = new RocketHeaders()
+ *     .contentType(RocketHeaders.ContentTypes.APPLICATION_JSON)
+ *     .accept(RocketHeaders.ContentTypes.APPLICATION_JSON)
+ *     .set(&quot;X-Custom-Header&quot;, &quot;custom-value&quot;);
+ *
+ * // Use in request
+ * RequestSpec request = RequestBuilder.post(&quot;/users&quot;)
+ *     .headers(headers)
+ *     .body(user)
+ *     .responseType(User.class)
+ *     .build();
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Authentication Headers&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Bearer token authentication
+ * RocketHeaders headers = new RocketHeaders()
+ *     .bearerAuth(&quot;my-jwt-token&quot;);
+ *
+ * // Basic authentication
+ * RocketHeaders basicAuth = new RocketHeaders()
+ *     .basicAuth(&quot;username&quot;, &quot;password&quot;);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Default JSON Headers&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Get pre-configured JSON headers
+ * RocketHeaders jsonHeaders = RocketHeaders.defaultJson();
+ * // Equivalent to Content-Type: application/json + Accept: application/json
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Merging Headers&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketHeaders base = RocketHeaders.defaultJson();
+ * RocketHeaders auth = new RocketHeaders().bearerAuth(&quot;token&quot;);
+ *
+ * // Merge headers (auth values take precedence)
+ * RocketHeaders merged = base.merge(auth);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see com.guinetik.rr.request.RequestBuilder
+ * @since 1.0.0
+ */
+public class RocketHeaders {
+    
+    private final Map&lt;String, String&gt; headers;
+    
+    /**
+     * Standard HTTP header names as constants.
+     */
+<span class="nc" id="L66">    public static final class Names {</span>
+        public static final String CONTENT_TYPE = &quot;Content-Type&quot;;
+        public static final String ACCEPT = &quot;Accept&quot;;
+        public static final String AUTHORIZATION = &quot;Authorization&quot;;
+        public static final String USER_AGENT = &quot;User-Agent&quot;;
+        public static final String CONTENT_LENGTH = &quot;Content-Length&quot;;
+    }
+    
+    /**
+     * Common content types as constants.
+     */
+<span class="nc" id="L77">    public static final class ContentTypes {</span>
+        public static final String APPLICATION_JSON = &quot;application/json&quot;;
+        public static final String APPLICATION_FORM = &quot;application/x-www-form-urlencoded&quot;;
+        public static final String TEXT_PLAIN = &quot;text/plain&quot;;
+        public static final String MULTIPART_FORM = &quot;multipart/form-data&quot;;
+    }
+    
+    /**
+     * Creates a new empty header container.
+     */
+<span class="fc" id="L87">    public RocketHeaders() {</span>
+<span class="fc" id="L88">        this.headers = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L89">    }</span>
+    
+    /**
+     * Creates a new header container with the specified headers.
+     *
+     * @param headers The initial headers
+     */
+<span class="fc" id="L96">    public RocketHeaders(Map&lt;String, String&gt; headers) {</span>
+<span class="fc" id="L97">        this.headers = new HashMap&lt;&gt;(headers);</span>
+<span class="fc" id="L98">    }</span>
+    
+    /**
+     * Sets a header value.
+     *
+     * @param name The header name
+     * @param value The header value
+     * @return This HttpHeader instance for chaining
+     */
+    public RocketHeaders set(String name, String value) {
+<span class="fc" id="L108">        headers.put(name, value);</span>
+<span class="fc" id="L109">        return this;</span>
+    }
+    
+    /**
+     * Gets a header value.
+     *
+     * @param name The header name
+     * @return The header value or null if not present
+     */
+    public String get(String name) {
+<span class="fc" id="L119">        return headers.get(name);</span>
+    }
+    
+    /**
+     * Removes a header.
+     *
+     * @param name The header name
+     * @return This HttpHeader instance for chaining
+     */
+    public RocketHeaders remove(String name) {
+<span class="fc" id="L129">        headers.remove(name);</span>
+<span class="fc" id="L130">        return this;</span>
+    }
+    
+    /**
+     * Checks if a header is present.
+     *
+     * @param name The header name
+     * @return true if the header is present
+     */
+    public boolean contains(String name) {
+<span class="fc" id="L140">        return headers.containsKey(name);</span>
+    }
+    
+    /**
+     * Sets the Content-Type header.
+     *
+     * @param contentType The content type
+     * @return This HttpHeader instance for chaining
+     */
+    public RocketHeaders contentType(String contentType) {
+<span class="fc" id="L150">        return set(Names.CONTENT_TYPE, contentType);</span>
+    }
+    
+    /**
+     * Sets the Accept header.
+     *
+     * @param accept The accept value
+     * @return This HttpHeader instance for chaining
+     */
+    public RocketHeaders accept(String accept) {
+<span class="fc" id="L160">        return set(Names.ACCEPT, accept);</span>
+    }
+    
+    /**
+     * Sets the Authorization header with a Bearer token.
+     *
+     * @param token The token
+     * @return This HttpHeader instance for chaining
+     */
+    public RocketHeaders bearerAuth(String token) {
+<span class="fc" id="L170">        return set(Names.AUTHORIZATION, &quot;Bearer &quot; + token);</span>
+    }
+    
+    /**
+     * Sets the Authorization header with Basic authentication.
+     *
+     * @param username The username
+     * @param password The password
+     * @return This HttpHeader instance for chaining
+     */
+    public RocketHeaders basicAuth(String username, String password) {
+<span class="fc" id="L181">        String auth = java.util.Base64.getEncoder().encodeToString((username + &quot;:&quot; + password).getBytes());</span>
+<span class="fc" id="L182">        return set(Names.AUTHORIZATION, &quot;Basic &quot; + auth);</span>
+    }
+    
+    /**
+     * Gets all headers as a Map.
+     *
+     * @return An unmodifiable view of the header map
+     */
+    public Map&lt;String, String&gt; asMap() {
+<span class="fc" id="L191">        return java.util.Collections.unmodifiableMap(headers);</span>
+    }
+    
+    /**
+     * Merges this header with another, with values from the other taking precedence.
+     *
+     * @param other The other HttpHeader instance
+     * @return A new HttpHeader instance with merged values
+     */
+    public RocketHeaders merge(RocketHeaders other) {
+<span class="fc" id="L201">        RocketHeaders result = new RocketHeaders(this.headers);</span>
+<span class="fc" id="L202">        result.headers.putAll(other.headers);</span>
+<span class="fc" id="L203">        return result;</span>
+    }
+    
+    /**
+     * Creates a set of default headers with JSON content type.
+     *
+     * @return A new HttpHeader with JSON content type and accept headers
+     */
+    public static RocketHeaders defaultJson() {
+<span class="fc" id="L212">        return new RocketHeaders()</span>
+<span class="fc" id="L213">            .contentType(ContentTypes.APPLICATION_JSON)</span>
+<span class="fc" id="L214">            .accept(ContentTypes.APPLICATION_JSON);</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

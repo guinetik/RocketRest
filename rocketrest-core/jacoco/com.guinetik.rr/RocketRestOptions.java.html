@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RocketRestOptions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr</a> &gt; <span class="el_source">RocketRestOptions.java</span></div><h1>RocketRestOptions.java</h1><pre class="source lang-java linenums">package com.guinetik.rr;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Configuration options for RocketRest API clients.
+ *
+ * &lt;p&gt;This class provides a type-safe, centralized container for all configurable options
+ * across different client implementations. Options are stored as key-value pairs and
+ * can be retrieved with type-specific methods.
+ *
+ * &lt;h2&gt;Available Options&lt;/h2&gt;
+ * &lt;table border=&quot;1&quot;&gt;
+ *   &lt;caption&gt;Configuration options for RocketRest clients&lt;/caption&gt;
+ *   &lt;tr&gt;&lt;th&gt;Option&lt;/th&gt;&lt;th&gt;Type&lt;/th&gt;&lt;th&gt;Default&lt;/th&gt;&lt;th&gt;Description&lt;/th&gt;&lt;/tr&gt;
+ *   &lt;tr&gt;&lt;td&gt;{@link #RETRY_ENABLED}&lt;/td&gt;&lt;td&gt;Boolean&lt;/td&gt;&lt;td&gt;true&lt;/td&gt;&lt;td&gt;Enable automatic retry on failure&lt;/td&gt;&lt;/tr&gt;
+ *   &lt;tr&gt;&lt;td&gt;{@link #MAX_RETRIES}&lt;/td&gt;&lt;td&gt;Integer&lt;/td&gt;&lt;td&gt;3&lt;/td&gt;&lt;td&gt;Maximum number of retry attempts&lt;/td&gt;&lt;/tr&gt;
+ *   &lt;tr&gt;&lt;td&gt;{@link #RETRY_DELAY}&lt;/td&gt;&lt;td&gt;Long&lt;/td&gt;&lt;td&gt;1000&lt;/td&gt;&lt;td&gt;Delay between retries in milliseconds&lt;/td&gt;&lt;/tr&gt;
+ *   &lt;tr&gt;&lt;td&gt;{@link #LOGGING_ENABLED}&lt;/td&gt;&lt;td&gt;Boolean&lt;/td&gt;&lt;td&gt;true&lt;/td&gt;&lt;td&gt;Enable request/response logging&lt;/td&gt;&lt;/tr&gt;
+ *   &lt;tr&gt;&lt;td&gt;{@link #LOG_REQUEST_BODY}&lt;/td&gt;&lt;td&gt;Boolean&lt;/td&gt;&lt;td&gt;false&lt;/td&gt;&lt;td&gt;Log request body content&lt;/td&gt;&lt;/tr&gt;
+ *   &lt;tr&gt;&lt;td&gt;{@link #LOG_RESPONSE_BODY}&lt;/td&gt;&lt;td&gt;Boolean&lt;/td&gt;&lt;td&gt;false&lt;/td&gt;&lt;td&gt;Log response body content&lt;/td&gt;&lt;/tr&gt;
+ *   &lt;tr&gt;&lt;td&gt;{@link #ASYNC_POOL_SIZE}&lt;/td&gt;&lt;td&gt;Integer&lt;/td&gt;&lt;td&gt;4&lt;/td&gt;&lt;td&gt;Thread pool size for async operations&lt;/td&gt;&lt;/tr&gt;
+ * &lt;/table&gt;
+ *
+ * &lt;h2&gt;Usage&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * // Configure via RocketRestConfig builder
+ * RocketRestConfig config = RocketRestConfig.builder(&quot;https://api.example.com&quot;)
+ *     .defaultOptions(options -&amp;gt; {
+ *         options.set(RocketRestOptions.RETRY_ENABLED, true);
+ *         options.set(RocketRestOptions.MAX_RETRIES, 5);
+ *         options.set(RocketRestOptions.LOG_REQUEST_BODY, true);
+ *     })
+ *     .build();
+ *
+ * // Or configure directly on client
+ * RocketRest client = new RocketRest(config);
+ * client.configure(RocketRestOptions.RETRY_DELAY, 2000L);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Reading Options&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;&lt;code&gt;
+ * RocketRestOptions options = new RocketRestOptions();
+ * boolean retryEnabled = options.getBoolean(RocketRestOptions.RETRY_ENABLED, false);
+ * int maxRetries = options.getInt(RocketRestOptions.MAX_RETRIES, 3);
+ * long delay = options.getLong(RocketRestOptions.RETRY_DELAY, 1000L);
+ * &lt;/code&gt;&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see RocketRestConfig
+ * @see RocketRest#configure(String, Object)
+ * @since 1.0.0
+ */
+public class RocketRestOptions {
+    // Common options
+    public static final String RETRY_ENABLED = &quot;retry.enabled&quot;;
+    public static final String MAX_RETRIES = &quot;retry.max&quot;;
+    public static final String RETRY_DELAY = &quot;retry.delay&quot;;
+    public static final String LOGGING_ENABLED = &quot;logging.enabled&quot;;
+    public static final String TIMING_ENABLED = &quot;timing.enabled&quot;;
+    public static final String LOG_REQUEST_BODY = &quot;logging.request.body&quot;;
+    public static final String LOG_RESPONSE_BODY = &quot;logging.response.body&quot;;
+    public static final String LOG_RAW_RESPONSE = &quot;logging.response.raw&quot;;
+    public static final String MAX_LOGGED_BODY_LENGTH = &quot;logging.body.maxlength&quot;;
+
+    // Async options
+    public static final String ASYNC_POOL_SIZE = &quot;async.pool.size&quot;;
+
+    // Token refresh URL option
+    public static final String TOKEN_URL = &quot;tokenUrl&quot;;
+
+<span class="fc" id="L74">    private final Map&lt;String, Object&gt; options = new HashMap&lt;&gt;();</span>
+
+    /**
+     * Creates a new ClientOptions with default values.
+     */
+<span class="fc" id="L79">    public RocketRestOptions() {</span>
+        // Set defaults
+<span class="fc" id="L81">        options.put(RETRY_ENABLED, Boolean.TRUE);</span>
+<span class="fc" id="L82">        options.put(MAX_RETRIES, 3);</span>
+<span class="fc" id="L83">        options.put(RETRY_DELAY, 1000L);</span>
+<span class="fc" id="L84">        options.put(LOGGING_ENABLED, Boolean.TRUE);</span>
+<span class="fc" id="L85">        options.put(TIMING_ENABLED, Boolean.TRUE);</span>
+<span class="fc" id="L86">        options.put(LOG_REQUEST_BODY, Boolean.FALSE);</span>
+<span class="fc" id="L87">        options.put(LOG_RESPONSE_BODY, Boolean.FALSE);</span>
+<span class="fc" id="L88">        options.put(LOG_RAW_RESPONSE, Boolean.TRUE);</span>
+<span class="fc" id="L89">        options.put(MAX_LOGGED_BODY_LENGTH, 4000);</span>
+<span class="fc" id="L90">        options.put(ASYNC_POOL_SIZE, 4);</span>
+<span class="fc" id="L91">    }</span>
+
+    /**
+     * Sets an option value.
+     *
+     * @param key   The option key.
+     * @param value The option value.
+     * @return This option instance for method chaining.
+     */
+    public RocketRestOptions set(String key, Object value) {
+<span class="fc" id="L101">        options.put(key, value);</span>
+<span class="fc" id="L102">        return this;</span>
+    }
+
+    /**
+     * Gets all option keys.
+     *
+     * @return Set of all option keys.
+     */
+    public Set&lt;String&gt; getKeys() {
+<span class="fc" id="L111">        return options.keySet();</span>
+    }
+
+    /**
+     * Gets the raw option value without type casting.
+     *
+     * @param key The option key.
+     * @return The raw option value, or null if not set.
+     */
+    public Object getRaw(String key) {
+<span class="fc" id="L121">        return options.get(key);</span>
+    }
+
+    /**
+     * Gets an option value.
+     *
+     * @param &lt;T&gt;          The expected type of the option value.
+     * @param key          The option key.
+     * @param defaultValue The default value to return if the option is not set.
+     * @return The option value, or the default value if not set.
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T&gt; T get(String key, T defaultValue) {
+<span class="nc" id="L134">        Object value = options.get(key);</span>
+<span class="nc bnc" id="L135" title="All 4 branches missed.">        if (defaultValue != null &amp;&amp; defaultValue.getClass().isInstance(value)) {</span>
+<span class="nc" id="L136">            return (T) value;</span>
+        }
+<span class="nc" id="L138">        return defaultValue;</span>
+    }
+
+    /**
+     * Gets a boolean option value.
+     *
+     * @param key          The option key.
+     * @param defaultValue The default value to return if the option is not set.
+     * @return The boolean option value.
+     */
+    public boolean getBoolean(String key, boolean defaultValue) {
+<span class="fc" id="L149">        Object value = options.get(key);</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (value instanceof Boolean) {</span>
+<span class="fc" id="L151">            return (Boolean) value;</span>
+        }
+<span class="fc" id="L153">        return defaultValue;</span>
+    }
+
+    /**
+     * Gets an integer option value.
+     *
+     * @param key          The option key.
+     * @param defaultValue The default value to return if the option is not set.
+     * @return The integer option value.
+     */
+    public int getInt(String key, int defaultValue) {
+<span class="fc" id="L164">        Object value = options.get(key);</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (value instanceof Number) {</span>
+<span class="fc" id="L166">            return ((Number) value).intValue();</span>
+        }
+<span class="fc" id="L168">        return defaultValue;</span>
+    }
+
+    /**
+     * Gets a long option value.
+     *
+     * @param key          The option key.
+     * @param defaultValue The default value to return if the option is not set.
+     * @return The long option value.
+     */
+    public long getLong(String key, long defaultValue) {
+<span class="fc" id="L179">        Object value = options.get(key);</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (value instanceof Number) {</span>
+<span class="fc" id="L181">            return ((Number) value).longValue();</span>
+        }
+<span class="fc" id="L183">        return defaultValue;</span>
+    }
+
+    public boolean contains(String feature) {
+<span class="fc" id="L187">        return this.options.containsKey(feature);</span>
+    }
+
+    public String getString(String feature, String defaultValue) {
+<span class="fc" id="L191">        Object value = options.get(feature);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        if (value instanceof String) {</span>
+<span class="fc" id="L193">            return (String) value;</span>
+        }
+<span class="fc" id="L195">        return defaultValue;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

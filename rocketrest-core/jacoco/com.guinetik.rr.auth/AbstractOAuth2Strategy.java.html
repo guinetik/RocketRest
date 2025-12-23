@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractOAuth2Strategy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.auth</a> &gt; <span class="el_source">AbstractOAuth2Strategy.java</span></div><h1>AbstractOAuth2Strategy.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.auth;
+
+import com.guinetik.rr.RocketRestOptions;
+import com.guinetik.rr.http.DefaultHttpClient;
+import com.guinetik.rr.http.RocketHeaders;
+import com.guinetik.rr.http.RocketRestException;
+import com.guinetik.rr.json.JsonObjectMapper;
+import com.guinetik.rr.request.RequestBuilder;
+import com.guinetik.rr.request.RequestSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.net.ssl.SSLContext;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.time.Instant;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Abstract base class for OAuth 2.0 authentication strategies.
+ * Provides common functionality for different OAuth2 flows.
+ */
+public abstract class AbstractOAuth2Strategy implements AuthStrategy, RocketSSL.SSLAware {
+
+<span class="fc" id="L27">    protected final Logger logger = LoggerFactory.getLogger(getClass());</span>
+
+    protected final Map&lt;String, String&gt; additionalParams;
+
+    /**
+     * OAuth 2.0 token endpoint URL to be used when refreshing credentials.
+     */
+    protected final String oauthTokenUrl;
+
+    protected String accessToken;
+    protected Date tokenExpiryTime;
+    protected boolean isRefreshing;
+    protected DefaultHttpClient httpClient;
+
+    /**
+     * Creates a new OAuth 2.0 strategy with additional parameters.
+     *
+     * @param tokenUrl        the OAuth 2.0 token endpoint URL
+     * @param additionalParams additional parameters to include in the token request
+     */
+<span class="fc" id="L47">    protected AbstractOAuth2Strategy(String tokenUrl, Map&lt;String, String&gt; additionalParams) {</span>
+<span class="fc" id="L48">        this.oauthTokenUrl = tokenUrl;</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        this.additionalParams = additionalParams != null ? additionalParams : new HashMap&lt;&gt;();</span>
+<span class="fc" id="L50">        this.isRefreshing = false;</span>
+<span class="fc" id="L51">    }</span>
+
+    @Override
+    public RocketHeaders applyAuthHeaders(RocketHeaders headers) {
+<span class="pc bpc" id="L55" title="2 of 4 branches missed.">        if (accessToken != null &amp;&amp; !accessToken.isEmpty()) {</span>
+<span class="fc" id="L56">            headers.bearerAuth(accessToken);</span>
+        }
+<span class="fc" id="L58">        return headers;</span>
+    }
+
+    @Override
+    public boolean needsTokenRefresh() {
+<span class="pc bpc" id="L63" title="1 of 4 branches missed.">        if (accessToken == null || accessToken.isEmpty()) {</span>
+<span class="fc" id="L64">            return true;</span>
+        }
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (tokenExpiryTime == null) {</span>
+<span class="fc" id="L67">            return true;</span>
+        }
+        // Refresh the token if it's expired or about to expire in the next 5 minutes
+<span class="fc" id="L70">        return Instant.now().plusSeconds(300).isAfter(tokenExpiryTime.toInstant());</span>
+    }
+
+    /**
+     * Helper method to perform POST requests.
+     * 
+     * @param url the URL to send the request to
+     * @param formParams the form parameters to include in the request
+     * @return the response body as a string
+     * @throws IOException if an I/O error occurs
+     */
+    protected String post(String url, Map&lt;String, String&gt; formParams) throws IOException {
+        // Initialize the HTTP client if not already done
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (httpClient == null) {</span>
+<span class="fc" id="L84">            String baseUrl = url.substring(0, url.lastIndexOf(&quot;/&quot;) + 1);</span>
+<span class="fc" id="L85">            RocketRestOptions options = new RocketRestOptions();</span>
+<span class="fc" id="L86">            options.set(RocketRestOptions.LOGGING_ENABLED, true);</span>
+<span class="fc" id="L87">            options.set(RocketRestOptions.LOG_RAW_RESPONSE, true);</span>
+<span class="fc" id="L88">            options.set(RocketRestOptions.LOG_REQUEST_BODY, true);</span>
+<span class="fc" id="L89">            options.set(RocketRestOptions.LOG_RAW_RESPONSE, true);</span>
+<span class="fc" id="L90">            httpClient = new DefaultHttpClient(baseUrl, options);</span>
+        }
+        // Build the form body
+<span class="fc" id="L93">        StringBuilder formBody = new StringBuilder();</span>
+        try {
+<span class="fc" id="L95">            boolean first = true;</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            for (Map.Entry&lt;String, String&gt; entry : formParams.entrySet()) {</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                if (!first) {</span>
+<span class="fc" id="L98">                    formBody.append(&quot;&amp;&quot;);</span>
+                }
+<span class="fc" id="L100">                first = false;</span>
+<span class="fc" id="L101">                formBody.append(entry.getKey())</span>
+<span class="fc" id="L102">                        .append(&quot;=&quot;)</span>
+<span class="fc" id="L103">                        .append(java.net.URLEncoder.encode(entry.getValue(), &quot;UTF-8&quot;));</span>
+<span class="fc" id="L104">            }</span>
+<span class="nc" id="L105">        } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L106">            logger.error(&quot;Error encoding form parameters&quot;, e);</span>
+<span class="nc" id="L107">            throw new TokenRefreshException(&quot;Error encoding form parameters&quot;, e);</span>
+<span class="fc" id="L108">        }</span>
+        // Create headers
+<span class="fc" id="L110">        RocketHeaders headers = new RocketHeaders()</span>
+<span class="fc" id="L111">                .contentType(RocketHeaders.ContentTypes.APPLICATION_FORM);</span>
+        // Extract a path from the full URL for the request
+<span class="fc" id="L113">        String endpoint = url.substring(url.lastIndexOf(&quot;/&quot;) + 1);</span>
+        // Create the request using a builder
+<span class="fc" id="L115">        RequestSpec&lt;String, String&gt; requestSpec = RequestBuilder.&lt;String, String&gt;post(endpoint)</span>
+<span class="fc" id="L116">                .headers(headers)</span>
+<span class="fc" id="L117">                .body(formBody.toString())</span>
+<span class="fc" id="L118">                .responseType(String.class)</span>
+<span class="fc" id="L119">                .build();</span>
+        // Execute the request
+        try {
+<span class="nc" id="L122">            return httpClient.execute(requestSpec);</span>
+<span class="fc" id="L123">        } catch (RocketRestException e) {</span>
+<span class="fc" id="L124">            logger.error(&quot;Error executing POST request&quot;, e);</span>
+<span class="fc" id="L125">            logger.error(&quot;Status Code: {}&quot;, e.getStatusCode());</span>
+<span class="fc" id="L126">            logger.error(&quot;Response Body: {}&quot;, e.getResponseBody());</span>
+<span class="fc" id="L127">            throw e;</span>
+        }
+<span class="nc" id="L129">        catch (Exception e) {</span>
+<span class="nc" id="L130">            logger.error(&quot;Error executing POST request&quot;, e);</span>
+<span class="nc" id="L131">            throw new IOException(&quot;Error executing POST request&quot;, e);</span>
+        }
+    }
+
+    @Override
+    public boolean refreshCredentials() {
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (isRefreshing) {</span>
+<span class="nc" id="L138">            logger.warn(&quot;Token refresh already in progress&quot;);</span>
+<span class="nc" id="L139">            return false;</span>
+        }
+        // Check if the token URL is provided
+<span class="nc bnc" id="L142" title="All 4 branches missed.">        if (oauthTokenUrl == null || oauthTokenUrl.isEmpty()) {</span>
+<span class="nc" id="L143">            throw new TokenRefreshException(&quot;Token URL is required for OAuth2 flow&quot;);</span>
+        }
+        // Validate the credentials
+<span class="nc" id="L146">        validateCredentials();</span>
+        // Set the refreshing flag
+<span class="nc" id="L148">        isRefreshing = true;</span>
+        // Try to refresh the token
+        try {
+            // Prepare form parameters
+<span class="nc" id="L152">            Map&lt;String, String&gt; formParams = prepareTokenRequestParams();</span>
+            // Add any additional parameters
+<span class="nc" id="L154">            formParams.putAll(additionalParams);</span>
+            // Execute POST request to get token
+<span class="nc" id="L156">            String responseString = post(oauthTokenUrl, formParams);</span>
+            // Parse the response. Flexing some of the one-liners we pack with JsonObjectMapper
+<span class="nc" id="L158">            Map&lt;String, Object&gt; tokenResponse = JsonObjectMapper.jsonNodeToMap(JsonObjectMapper.getJsonNode(responseString));</span>
+            // Process the token response
+<span class="nc" id="L160">            return processTokenResponse(tokenResponse);</span>
+<span class="nc" id="L161">        } catch (Exception e) {</span>
+<span class="nc" id="L162">            logger.error(&quot;Error during token refresh&quot;, e);</span>
+<span class="nc" id="L163">            throw new TokenRefreshException(&quot;Error during token refresh&quot;, e);</span>
+        } finally {
+<span class="nc" id="L165">            isRefreshing = false;</span>
+        }
+    }
+
+    /**
+     * Validates that all required credentials are present.
+     * @throws TokenRefreshException if any required credentials are missing
+     */
+    protected abstract void validateCredentials();
+
+    /**
+     * Prepares the parameters for the token request.
+     * @return map of parameters to include in the token request
+     */
+    protected abstract Map&lt;String, String&gt; prepareTokenRequestParams();
+
+    /**
+     * Processes the token response and extracts relevant information.
+     * @param tokenResponse the parsed token response
+     * @return true if the token was successfully refreshed, false otherwise
+     * @throws TokenRefreshException if there was an error processing the token response
+     */
+    protected boolean processTokenResponse(Map&lt;String, Object&gt; tokenResponse) {
+<span class="fc" id="L188">        Object tokenObj = tokenResponse.get(&quot;access_token&quot;);</span>
+<span class="fc" id="L189">        Object expiresInObj = tokenResponse.get(&quot;expires_in&quot;);</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (tokenObj != null) {</span>
+<span class="fc" id="L191">            accessToken = tokenObj.toString();</span>
+            // Calculate expiry time
+<span class="fc" id="L193">            long expiresIn = 3600; // Default to 1 hour</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            if (expiresInObj != null) {</span>
+                try {
+<span class="fc" id="L196">                    expiresIn = Long.parseLong(expiresInObj.toString());</span>
+<span class="nc" id="L197">                } catch (NumberFormatException e) {</span>
+<span class="nc" id="L198">                    logger.warn(&quot;Invalid expires_in value: {}&quot;, expiresInObj);</span>
+<span class="fc" id="L199">                }</span>
+            }
+<span class="fc" id="L201">            tokenExpiryTime = Date.from(Instant.now().plusSeconds(expiresIn));</span>
+<span class="fc" id="L202">            logger.debug(&quot;Token refreshed successfully, expires in {} seconds&quot;, expiresIn);</span>
+<span class="fc" id="L203">            return true;</span>
+        } else {
+<span class="nc" id="L205">            logger.error(&quot;Token response did not contain access_token: {}&quot;, tokenResponse);</span>
+<span class="nc" id="L206">            throw new TokenRefreshException(&quot;Token response did not contain access_token&quot;);</span>
+        }
+    }
+
+    /**
+     * Gets the current access token.
+     * @return the current access token, or null if not yet obtained
+     */
+    public String getAccessToken() {
+<span class="nc" id="L215">        return accessToken;</span>
+    }
+
+    /**
+     * Gets the token expiry time.
+     * @return the token expiry time, or null if not yet obtained
+     */
+    public Date getTokenExpiryTime() {
+<span class="nc" id="L223">        return tokenExpiryTime;</span>
+    }
+
+    /**
+     * Sets the SSL context for secure token requests.
+     * @param sslContext the SSL context to use
+     */
+    public void configureSsl(SSLContext sslContext) {
+<span class="nc bnc" id="L231" title="All 2 branches missed.">        if (httpClient != null) {</span>
+<span class="nc" id="L232">            httpClient.configureSsl(sslContext);</span>
+        }
+<span class="nc" id="L234">    }</span>
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

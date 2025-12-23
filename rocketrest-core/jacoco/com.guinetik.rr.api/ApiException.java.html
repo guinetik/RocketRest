@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApiException.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.api</a> &gt; <span class="el_source">ApiException.java</span></div><h1>ApiException.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.api;
+
+import com.guinetik.rr.http.RocketRestException;
+
+/**
+ * Exception thrown when an API request fails with rich error details.
+ *
+ * &lt;p&gt;This exception extends {@link RocketRestException} and provides additional
+ * context about API failures including the error message from the server.
+ * Use this when you need more details than the base exception provides.
+ *
+ * &lt;h2&gt;Exception Hierarchy&lt;/h2&gt;
+ * &lt;pre&gt;
+ * RuntimeException
+ *   └── RocketRestException (base HTTP exception)
+ *         ├── CircuitBreakerOpenException
+ *         ├── TokenExpiredException
+ *         └── ApiException (richer error details)
+ *               └── errorMessage: Server error message
+ * &lt;/pre&gt;
+ *
+ * &lt;h2&gt;Handling ApiException&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;{@code
+ * try {
+ *     User user = client.get(&quot;/users/999&quot;, User.class);
+ * } catch (ApiException e) {
+ *     System.err.println(&quot;Status: &quot; + e.getStatusCode());
+ *     System.err.println(&quot;Message: &quot; + e.getErrorMessage());
+ *     System.err.println(&quot;Body: &quot; + e.getResponseBody());
+ * } catch (RocketRestException e) {
+ *     // Handles all other HTTP exceptions
+ *     System.err.println(&quot;HTTP error: &quot; + e.getStatusCode());
+ * }
+ * }&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Avoiding Exceptions with Result Pattern&lt;/h2&gt;
+ * &lt;p&gt;Consider using the fluent API with {@link com.guinetik.rr.result.Result} to avoid exceptions:
+ * &lt;pre class=&quot;language-java&quot;&gt;{@code
+ * Result&lt;User, ApiError&gt; result = client.fluent().get(&quot;/users/999&quot;, User.class);
+ * result.match(
+ *     user -&gt; handleSuccess(user),
+ *     error -&gt; handleError(error)  // No exception thrown
+ * );
+ * }&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see RocketRestException
+ * @see com.guinetik.rr.result.Result
+ * @see com.guinetik.rr.result.ApiError
+ * @since 1.0.0
+ */
+public class ApiException extends RocketRestException {
+
+    private static final long serialVersionUID = 1L;
+
+    private final String errorMessage;
+
+    /**
+     * Creates a new ApiException with full error details.
+     *
+     * @param message The exception message
+     * @param responseBody The raw response body from the server
+     * @param errorMessage The parsed error message from the server
+     * @param statusCode The HTTP status code
+     */
+    public ApiException(String message, String responseBody, String errorMessage, int statusCode) {
+<span class="fc" id="L67">        super(message, statusCode, responseBody);</span>
+<span class="fc" id="L68">        this.errorMessage = errorMessage;</span>
+<span class="fc" id="L69">    }</span>
+
+    /**
+     * Creates a new ApiException with just a message.
+     *
+     * @param message The exception message
+     */
+    public ApiException(String message) {
+<span class="nc" id="L77">        super(message);</span>
+<span class="nc" id="L78">        this.errorMessage = null;</span>
+<span class="nc" id="L79">    }</span>
+
+    /**
+     * Creates a new ApiException with a message and cause.
+     *
+     * @param message The exception message
+     * @param cause The underlying cause
+     */
+    public ApiException(String message, Throwable cause) {
+<span class="nc" id="L88">        super(message, cause);</span>
+<span class="nc" id="L89">        this.errorMessage = null;</span>
+<span class="nc" id="L90">    }</span>
+
+    /**
+     * Gets the parsed error message from the server response.
+     * This is often a more user-friendly message extracted from the response body.
+     *
+     * @return The server error message, or null if not available
+     */
+    public String getErrorMessage() {
+<span class="nc" id="L99">        return errorMessage;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

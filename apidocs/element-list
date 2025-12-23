@@ -1,0 +1,10 @@
+com.guinetik.examples
+com.guinetik.rr
+com.guinetik.rr.api
+com.guinetik.rr.auth
+com.guinetik.rr.http
+com.guinetik.rr.interceptor
+com.guinetik.rr.json
+com.guinetik.rr.request
+com.guinetik.rr.result
+com.guinetik.rr.util

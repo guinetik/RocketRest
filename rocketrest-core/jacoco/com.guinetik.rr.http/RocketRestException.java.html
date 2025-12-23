@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RocketRestException.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script>
+<!-- <!-- terminal-javadocs-injected [coverage] -->
+<link rel="stylesheet" href="../../../terminal-styles/terminaljavadocs-coverage.min.css">
+<script src="../../../terminal-styles/terminaljavadocs.min.js" defer></script>
+</head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">RocketRest Core</a> &gt; <a href="index.source.html" class="el_package">com.guinetik.rr.http</a> &gt; <span class="el_source">RocketRestException.java</span></div><h1>RocketRestException.java</h1><pre class="source lang-java linenums">package com.guinetik.rr.http;
+
+/**
+ * Base runtime exception for all HTTP-related errors in RocketRest.
+ *
+ * &lt;p&gt;This exception captures HTTP error details including the status code and response body,
+ * making it easier to handle and diagnose API errors. As a RuntimeException, it doesn't
+ * require explicit catching, but can be caught for specific error handling.
+ *
+ * &lt;h2&gt;Exception Hierarchy&lt;/h2&gt;
+ * &lt;pre&gt;
+ * RuntimeException
+ *   └── RocketRestException (base - catch this for all HTTP errors)
+ *         ├── CircuitBreakerOpenException (circuit breaker is open)
+ *         ├── TokenExpiredException (401 - token needs refresh)
+ *         └── ApiException (richer error details from server)
+ * &lt;/pre&gt;
+ *
+ * &lt;h2&gt;Exception Handling&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;{@code
+ * try {
+ *     User user = client.get(&quot;/users/1&quot;, User.class);
+ * } catch (CircuitBreakerOpenException e) {
+ *     // Service is down, fail fast
+ *     System.out.println(&quot;Service unavailable, retry in &quot; + e.getEstimatedMillisUntilReset() + &quot;ms&quot;);
+ * } catch (TokenExpiredException e) {
+ *     // Token expired, re-authenticate
+ *     refreshToken();
+ * } catch (RocketRestException e) {
+ *     // All other HTTP errors
+ *     System.err.println(&quot;HTTP &quot; + e.getStatusCode() + &quot;: &quot; + e.getMessage());
+ * }
+ * }&lt;/pre&gt;
+ *
+ * &lt;h2&gt;Avoiding Exceptions with Fluent API&lt;/h2&gt;
+ * &lt;pre class=&quot;language-java&quot;&gt;{@code
+ * // Use fluent API to avoid exception handling
+ * Result&lt;User, ApiError&gt; result = client.fluent().get(&quot;/users/1&quot;, User.class);
+ *
+ * result.match(
+ *     user -&gt; System.out.println(&quot;Found: &quot; + user.getName()),
+ *     error -&gt; System.out.println(&quot;Error &quot; + error.getStatusCode() + &quot;: &quot; + error.getMessage())
+ * );
+ * }&lt;/pre&gt;
+ *
+ * @author guinetik &amp;lt;guinetik@gmail.com&amp;gt;
+ * @see CircuitBreakerOpenException
+ * @see com.guinetik.rr.auth.TokenExpiredException
+ * @see com.guinetik.rr.api.ApiException
+ * @see com.guinetik.rr.result.ApiError
+ * @since 1.0.0
+ */
+public class RocketRestException extends RuntimeException {
+    
+    private static final long serialVersionUID = 1L;
+    private int statusCode;
+    private String responseBody;
+    
+    /**
+     * Constructs a new exception with the specified detail message.
+     *
+     * @param message The detail message
+     */
+    public RocketRestException(String message) {
+<span class="fc" id="L65">        super(message);</span>
+<span class="fc" id="L66">    }</span>
+    
+    /**
+     * Constructs a new exception with the specified detail message and cause.
+     *
+     * @param message The detail message
+     * @param cause The cause
+     */
+    public RocketRestException(String message, Throwable cause) {
+<span class="fc" id="L75">        super(message, cause);</span>
+<span class="fc" id="L76">    }</span>
+    
+    /**
+     * Constructs a new exception with the specified detail message, status code, and response body.
+     *
+     * @param message The detail message
+     * @param statusCode The HTTP status code
+     * @param responseBody The response body
+     */
+    public RocketRestException(String message, int statusCode, String responseBody) {
+<span class="fc" id="L86">        super(message);</span>
+<span class="fc" id="L87">        this.statusCode = statusCode;</span>
+<span class="fc" id="L88">        this.responseBody = responseBody;</span>
+<span class="fc" id="L89">    }</span>
+    
+    /**
+     * Gets the HTTP status code.
+     *
+     * @return The HTTP status code
+     */
+    public int getStatusCode() {
+<span class="fc" id="L97">        return statusCode;</span>
+    }
+    
+    /**
+     * Gets the response body.
+     *
+     * @return The response body
+     */
+    public String getResponseBody() {
+<span class="fc" id="L106">        return responseBody;</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
